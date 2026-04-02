@@ -24,14 +24,12 @@ def color_text(text, color):
 
 def print_welcome_banner():
     banner = r"""
-   _____ _    _ ______  _____ _____        _____ _____
-  / ____| |  | |  ____|/ ____/ ____|      / ____|_   _|
- | |    | |__| | |__  | (___| (___ ______| |      | |
- | |    |  __  |  __|  \___ \\___ \______| |      | |
- | |____| |  | | |____ ____) |___) |     | |____ _| |_
-  \_____|_|  |_|______|_____/_____/       \_____|_____|
+===============================
+        CHESS AI
+===============================
 
-        CS50 AI Project - Chess AI with Forced Advantage
+CS50 AI Project
+Chess AI with Forced Advantage
     """
     print(color_text(banner, "cyan"))
 
