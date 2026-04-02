@@ -1,3 +1,4 @@
+
 """
 ai.py
 
@@ -123,4 +124,15 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, stats):
         return max_eval
 
     min_eval = float("inf")
-    for move
+    for move in moves:
+        gs.make_move(move)
+        eval_score = minimax(gs, depth - 1, alpha, beta, True, mode, stats)
+        gs.undo_move()
+
+        min_eval = min(min_eval, eval_score)
+        beta = min(beta, eval_score)
+
+        if beta <= alpha:
+            break
+
+    return min_eval
