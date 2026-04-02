@@ -5,12 +5,12 @@
 <img src="https://img.shields.io/badge/Modes-Fair%20%7C%20Hard%20%7C%20Forced--Win-orange?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Language-Python-yellow?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Level-CS50%20AI%20Project-green?style=for-the-badge" />
-
 </p>
+
+<br>
 
 <p align="center">
 
-<img src="https://img.shields.io/github/repo-size/Nomusa990822/Chess-ai?style=for-the-badge" />
 <img src="https://img.shields.io/github/last-commit/Nomusa990822/Chess-AI?style=for-the-badge" />
 <img src="https://img.shields.io/github/languages/top/Nomusa990822/Chess-AI?style=for-the-badge" />
 
@@ -21,7 +21,7 @@
 <h1 align="center">♟️ Chess AI with Forced Advantage</h1>
 
 <p align="center">
-A powerful adversarial AI system built using Minimax and Alpha-Beta Pruning.
+A strategic adversarial AI system built using Minimax search and Alpha-Beta pruning, designed to simulate intelligent decision-making in complex environments.
 </p>
 
 ---
@@ -32,9 +32,9 @@ This project implements a **full chess engine and AI opponent** built in Python 
 
 The system introduces **three distinct gameplay modes**:
 
-- 🎯 **Fair Mode** — balanced AI gameplay  
-- 🔥 **Hard Mode** — stronger AI with deeper reasoning  
-- ♟️ **Forced-Win Mode** — AI starts from a theoretically winning position  
+- **Fair Mode** — balanced AI gameplay  
+- **Hard Mode** — stronger AI with deeper reasoning  
+- **Forced-Win Mode** — AI starts from a theoretically winning position  
 
 Unlike traditional claims of “solving chess”, this project focuses on:
 
@@ -44,16 +44,16 @@ Unlike traditional claims of “solving chess”, this project focuses on:
 
 ## Key Highlights
 
-- ♟️ Full chess engine with legal move validation  
-- 🧠 AI powered by Minimax + Alpha-Beta pruning  
-- 🎯 Forced-Win mode using winning endgame positions  
-- 📊 Advanced heuristic evaluation system  
-- 🔁 Turn-based adversarial reasoning  
-- 💡 AI move explanations for transparency  
+- Full chess engine with legal move validation  
+- AI powered by Minimax + Alpha-Beta pruning  
+- Forced-Win mode using winning endgame positions  
+- Advanced heuristic evaluation system  
+- Turn-based adversarial reasoning  
+- AI move explanations for transparency  
 
 ---
 
-## 🎮 Game Modes
+## Game Modes
 
 | Mode | Description |
 |------|------------|
@@ -134,14 +134,16 @@ chess_ai/
 
 ## AI Techniques Used
 
-#### 1. Minimax Algorithm 
-Simulates future game states assuming optimal play from both sides
+**1. Minimax Algorithm**
+- Simulates future game states assuming optimal play from both sides
 
-#### 2. Alpha-Beta Pruning 
-Optimizes search by eliminating unnecessary branches
+**2. Alpha-Beta Pruning**
+- Optimizes search by eliminating unnecessary branches
 
-#### 3. Heuristic Evaluation
+**3. Heuristic Evaluation**
+
 Positions are evaluated using:
+
 - Material balance
 - Piece-square tables
 - Center control
@@ -177,7 +179,9 @@ python main.py
 ---
 
 ## Game Preview 
-![Game Preview](assets/game.png)
+<p align="center">
+  <img src="assets/game.jpg" width="700"/>
+</p>
 
 ---
 
