@@ -8,6 +8,10 @@ Tests for the core chess engine:
 - castling rights
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from engine import GameState, Move, CastleRights
 
 
