@@ -1,240 +1,196 @@
-# Chess AI Project Architecture
+# Chess AI System Architecture
 
 ## Overview
 
-This project follows a modular architecture that separates:
+This project follows a **layered AI system architecture** designed to separate:
 
+- game rules
+- search logic
+- evaluation
 - user interaction
-- game control
-- chess rules
-- AI search
-- evaluation logic
-- forced scenario loading
 
-The goal of this structure is to improve:
-
-- readability
+This separation ensures:
 - maintainability
-- testing
-- extensibility
+- scalability
+- testability
+- clarity of responsibility
 
-Rather than placing all logic in one file, the project is divided into specialized components.
+---
+
+## High-Level Architecture
+
+```mermaid
+flowchart TD
+    A[User Input] --> B[main.py]
+
+    B --> C[GameState Engine]
+    B --> D[AI Engine]
+
+    %% Game Engine
+    C --> C1[Move Generator]
+    C --> C2[Game Rules]
+    C --> C3[Board State Update]
+    C3 --> C4[Display Output]
+
+    %% AI Engine
+    D --> D1[Search Controller]
+    D --> D2[Move Ordering]
+    D --> D3[Principal Variation Tracking]
+
+    D1 --> D4[Minimax Search]
+    D4 --> D5[Alpha-Beta Pruning]
+    D5 --> D6[Transposition Table]
+    D6 --> D7[Quiescence Search]
+    D7 --> D8[Evaluation Function]
+
+    %% Evaluation
+    D8 --> E1[Material]
+    D8 --> E2[Piece-Square Tables]
+    D8 --> E3[Pawn Structure]
+    D8 --> E4[Mobility]
+    D8 --> E5[King Safety]
+```
 
 ---
 
 ## Architectural Layers
-
 ### 1. Presentation Layer
 
-This layer is responsible for all user-facing interaction.
+**Responsibility:**
+* user interaction
+* game flow control
+* rendering board
+* displaying AI insights
 
-It handles:
-- the menu
-- the board display
-- user input
-- help messages
-- AI search reports
-
-**Files involved**
-- `main.py`
-- `utils.py`
-
-This layer should not contain chess rules or search logic.
-
+Files:
+* ```main.py```
+* ```utils.py```
 ---
 
 ### 2. Game Control Layer
 
-This layer coordinates the overall flow of the game.
+**Responsibility:**
+* coordinates turns
+* switches between player and AI
+* handles game termination
 
-It decides:
-- when to ask for input
-- when to call the AI
-- when the game is over
-- what should be displayed after each move
-
-**File involved**
-- `main.py`
-
-This acts as the orchestrator of the full system.
+**Key role:** Acts as the orchestrator of the system.
 
 ---
 
-### 3. Chess Engine Layer
+### 3. Chess Engine Layer (```engine.py```)
 
-This is the legal source of truth for the game.
+**Responsibility:**
+* generates legal moves
+* enforces rules of chess
+* updates board state
+* detects:
+  - check
+  - checkmate
+  - stalemate
+  - repetition
 
-It handles:
-- board state
-- move generation
-- move validation
-- applying moves
-- undoing moves
-- check and mate detection
-- stalemate and repetition
-- castling
-- en passant
-- promotion
-
-**File involved**
-- `engine.py`
-
-This is the foundation of the project.
+**Key Insight:** This layer is deterministic and rule-based; no AI here.
 
 ---
 
-### 4. Search Layer
+### 4. Search Layer (```ai.py```)
 
-This layer is the AI decision engine.
+**Responsibility:**
+* explores possible futures
+* chooses best move using adversarial search
 
-It handles:
-- iterative deepening
-- minimax
-- alpha-beta pruning
-- transposition table lookup
-- move ordering
-- quiescence search
-- principal variation tracking
-- search statistics
-
-**File involved**
-- `ai.py`
-
-This layer determines the best move to play from a given position.
+**Core Components:**
+* minimax recursion
+* alpha-beta pruning
+* iterative deepening
+* move ordering
+* quiescence search
+* principal variation tracking
 
 ---
 
-### 5. Evaluation Layer
+### 5. Evaluation Layer (```evaluation.py```)
 
-This layer scores chess positions when the search cannot reach a terminal state.
+**Responsibility:**
+* scores positions numerically
 
-It considers:
-- material balance
-- piece activity
-- piece-square tables
-- center control
-- mobility
-- pawn structure
-- game phase
-- endgame conversion pressure
-
-**File involved**
-- `evaluation.py`
-
-This provides strategic guidance to the search layer.
+**Key Principle:** Transforms board states into decision signals.
 
 ---
 
-### 6. Scenario Layer
+### 6. Scenario Layer (forced_positions.py)
 
-This layer provides pre-configured positions for Forced-Win mode.
-
-It is responsible for:
-- loading winning endgames
-- resetting rights correctly
-- preparing custom board states
-
-**File involved**
-- `forced_positions.py`
+**Responsibility:**
+* provides curated positions
+* used for forced-win mode
 
 ---
 
-### 7. Configuration Layer
+### 7. Testing Layer (tests/)
 
-This layer stores project-wide settings and mode-specific tuning values.
-
-It includes:
-- Fair / Hard / Forced mode parameters
-- search settings
-- feature toggles
-- display preferences
-
-**Files involved**
-- `config.py`
-- `constants.py`
+**Responsibility:**
+* validates correctness of:
+  - engine
+  - evaluation
+  - forced scenarios
 
 ---
 
-## Architecture Flow
+## Data Flow
 
-```text
-User Input / Terminal
-        ↓
-     main.py
-        ↓
- ┌───────────────┬────────────────┬──────────────────┐
- │               │                │                  │
-engine.py      ai.py        forced_positions.py    utils.py
- │               │
- │         evaluation.py
- │
-Board State + Legal Moves
-```
-
----
-
-## Search Flow
-
-```
-Current Position
-      ↓
-Generate Legal Moves
-      ↓
-Order Moves
-      ↓
-Iterative Deepening
-      ↓
-Minimax Search
-      ↓
-Alpha-Beta Pruning
-      ↓
-Transposition Table Lookup
-      ↓
-Quiescence Search at leaf nodes
-      ↓
-Evaluation Function
-      ↓
-Best Move + Principal Variation
+```mermaid
+flowchart LR
+    A[Board State] --> B[Move Generation]
+    B --> C[Search Tree]
+    C --> D[Evaluation]
+    D --> E[Best Move]
+    E --> F[Board Update]
+    F --> A
 ```
 
 ---
 
 ## Design Principles
 
-### 1. Separation of Concerns
+**1. Separation of Concerns**
+> Each module has a single responsibility.
 
-Each file has one primary responsibility.
-**Examples:**
-- ```engine.py``` handles rules
-- ```ai.py``` handles search
-- ```evaluation.py``` handles scoring
-- ```utils.py``` handles helpers
+**2. Deterministic Core + Heuristic Intelligence**
+> * engine = exact rules
+> * AI = probabilistic reasoning via heuristics
 
-This makes the project easier to debug and improve.
+**3. Explainability First**
 
-### 2. Modularity
+Unlike black-box systems, this engine:
+> * exposes reasoning
+> * shows evaluation breakdown
+> * explains decisions
 
-The system is designed so that one module can be improved without rewriting the others.
-**For example:**
-- evaluation can be improved without changing move generation
-- search can be upgraded without changing the terminal UI
-- more forced scenarios can be added without changing the engine
+**4. Extendability**
+Future upgrades can be added without breaking structure:
+> * opening books
+> * Zobrist hashing
+> * GUI
+> * ML evaluation
 
-### 3. Explainability
-
-The AI does not simply output a move.
-**It also exposes:**
-- evaluation score
-- search depth
-- nodes explored
-- top candidate moves
-- principal variation
-- textual explanation
-
-_This improves both transparency and presentation quality._
+---
+## Trade-offs
+| **Design Choice** | **Benefit** | **Cost** |
+|-------------------|-------------|----------|
+| Handcrafted evaluation | Interpretability | Requires tuning |
+| Minimax search | Optimal decision framework | Exponential complexity |
+| Quiescence search | Tactical stability | Extra compute |
+| Modular architecture | Clean design | Slight overhead |
 
 ---
 
-## Conclusion
-The architecture is intentionally layered and modular so that the chess engine, search system, and evaluation logic remain independent but cooperative.
+## Summary
 
+This architecture reflects a classical AI system:
+* rule-based environment
+* adversarial reasoning
+* heuristic evaluation
+* explainable outputs
+
+> It demonstrates how structured reasoning can produce strong intelligence without machine learning.
