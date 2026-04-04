@@ -175,6 +175,9 @@ The engine evaluates positions using multiple components:
 
 ## Explainability Example
 
+<p align="center">
+  <img src="assets/explainability_example.jpg" width="850" alt="Chess AI explainability example"/>
+</p>
 
 ---
 
@@ -218,6 +221,9 @@ python main.py
 
 ## Preview 
 
+<p align="center">
+  <img src="assets/game_preview.jpg" width="850" alt="Chess AI game preview"/>
+</p>
 
 ---
 
