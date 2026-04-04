@@ -6,15 +6,17 @@ Features:
 - piece-square tables
 - center control
 - advanced pawn structure evaluation
-- mobility
-- game phase awareness
 - bishop pair bonus
 - rook open/semi-open file bonus
 - rook on 7th rank bonus
 - knight outpost bonus
 - king pawn shield
+- mobility
+- game phase awareness
 - endgame king activity
 - edge pressure in winning endgames
+- evaluation breakdown printing
+- move explanation support
 """
 
 PIECE_VALUES = {
@@ -309,11 +311,6 @@ def bishop_pair_bonus(board):
 
 
 def rook_file_bonus(board):
-    """
-    Reward rooks on open and semi-open files.
-    Open file: no pawns of either color.
-    Semi-open file: no friendly pawn, but at least one enemy pawn.
-    """
     score = 0.0
 
     for c in range(8):
@@ -333,14 +330,12 @@ def rook_file_bonus(board):
             elif piece == "bR":
                 black_rooks += 1
 
-        # White rook bonuses
         if white_rooks > 0:
             if not white_pawn_on_file and not black_pawn_on_file:
                 score += 0.30 * white_rooks
             elif not white_pawn_on_file and black_pawn_on_file:
                 score += 0.15 * white_rooks
 
-        # Black rook bonuses
         if black_rooks > 0:
             if not white_pawn_on_file and not black_pawn_on_file:
                 score -= 0.30 * black_rooks
@@ -351,25 +346,16 @@ def rook_file_bonus(board):
 
 
 def rook_seventh_rank_bonus(board):
-    """
-    Reward rooks penetrating to the 7th rank.
-    White rook on row 1, black rook on row 6.
-    """
     score = 0.0
-
     for c in range(8):
         if board[1][c] == "wR":
             score += 0.20
         if board[6][c] == "bR":
             score -= 0.20
-
     return score
 
 
 def knight_outpost_bonus(board):
-    """
-    Reward knights on protected advanced squares that cannot easily be challenged by enemy pawns.
-    """
     score = 0.0
 
     for r in range(8):
@@ -377,7 +363,6 @@ def knight_outpost_bonus(board):
             piece = board[r][c]
 
             if piece == "wN":
-                # White outpost squares generally in enemy half
                 if r <= 4:
                     supported = False
                     for dc in (-1, 1):
@@ -419,35 +404,27 @@ def knight_outpost_bonus(board):
 
 
 def king_pawn_shield_score(gs, phase):
-    """
-    Reward kings that still have a pawn shield in front of them.
-    Most relevant in opening and middlegame.
-    """
     if phase == "endgame":
         return 0.0
 
     score = 0.0
 
-    # White king shield
     wr, wc = gs.white_king_location
     white_shield = 0
     for dc in (-1, 0, 1):
         rr = wr - 1
         cc = wc + dc
-        if 0 <= rr < 8 and 0 <= cc < 8:
-            if gs.board[rr][cc] == "wP":
-                white_shield += 1
+        if 0 <= rr < 8 and 0 <= cc < 8 and gs.board[rr][cc] == "wP":
+            white_shield += 1
     score += 0.12 * white_shield
 
-    # Black king shield
     br, bc = gs.black_king_location
     black_shield = 0
     for dc in (-1, 0, 1):
         rr = br + 1
         cc = bc + dc
-        if 0 <= rr < 8 and 0 <= cc < 8:
-            if gs.board[rr][cc] == "bP":
-                black_shield += 1
+        if 0 <= rr < 8 and 0 <= cc < 8 and gs.board[rr][cc] == "bP":
+            black_shield += 1
     score -= 0.12 * black_shield
 
     return score
@@ -501,77 +478,129 @@ def edge_pressure_score(gs):
     return score
 
 
-def evaluate_position(gs, mode="fair"):
+def get_evaluation_weights(mode):
+    if mode == "fair":
+        return {
+            "Material": 1.0,
+            "Piece-Square": 0.6,
+            "Center Control": 0.4,
+            "Pawns": 0.5,
+            "Bishops": 0.2,
+            "Rooks": 0.2,
+            "Knights": 0.2,
+            "King Shield": 0.2,
+            "Mobility": 0.0,
+            "King Activity": 0.0,
+            "Edge Pressure": 0.0
+        }
+
+    if mode == "hard":
+        return {
+            "Material": 1.0,
+            "Piece-Square": 0.7,
+            "Center Control": 0.5,
+            "Pawns": 0.7,
+            "Bishops": 0.4,
+            "Rooks": 0.4,
+            "Knights": 0.4,
+            "King Shield": 0.5,
+            "Mobility": 0.8,
+            "King Activity": 0.6,
+            "Edge Pressure": 0.0
+        }
+
+    return {
+        "Material": 1.0,
+        "Piece-Square": 0.7,
+        "Center Control": 0.4,
+        "Pawns": 0.8,
+        "Bishops": 0.4,
+        "Rooks": 0.4,
+        "Knights": 0.4,
+        "King Shield": 0.4,
+        "Mobility": 0.9,
+        "King Activity": 0.9,
+        "Edge Pressure": 1.2
+    }
+
+
+def evaluate_breakdown(gs, mode="fair"):
+    """
+    Returns a weighted breakdown of the position evaluation.
+    """
     if gs.checkmate:
-        return -9999 if gs.white_to_move else 9999
+        total = -9999 if gs.white_to_move else 9999
+        return {"Total": total}
 
     if gs.stalemate or gs.draw_by_repetition:
-        return 0.0
+        return {"Total": 0.0}
 
     phase = get_game_phase(gs.board)
 
-    mat = material_score(gs.board)
-    pst = piece_square_score(gs.board, phase)
-    center = center_control_score(gs.board)
-    pawns = pawn_structure_score(gs.board)
-    bishops = bishop_pair_bonus(gs.board)
-    rooks = rook_file_bonus(gs.board) + rook_seventh_rank_bonus(gs.board)
-    knights = knight_outpost_bonus(gs.board)
-    king_shield = king_pawn_shield_score(gs, phase)
-    mobility = mobility_score(gs)
-    king_activity = king_activity_score(gs, phase)
-    edge_pressure = edge_pressure_score(gs)
+    raw = {
+        "Material": material_score(gs.board),
+        "Piece-Square": piece_square_score(gs.board, phase),
+        "Center Control": center_control_score(gs.board),
+        "Pawns": pawn_structure_score(gs.board),
+        "Bishops": bishop_pair_bonus(gs.board),
+        "Rooks": rook_file_bonus(gs.board) + rook_seventh_rank_bonus(gs.board),
+        "Knights": knight_outpost_bonus(gs.board),
+        "King Shield": king_pawn_shield_score(gs, phase),
+        "Mobility": mobility_score(gs),
+        "King Activity": king_activity_score(gs, phase),
+        "Edge Pressure": edge_pressure_score(gs)
+    }
 
-    if mode == "fair":
-        return (
-            1.0 * mat
-            + 0.6 * pst
-            + 0.4 * center
-            + 0.5 * pawns
-            + 0.2 * bishops
-            + 0.2 * rooks
-            + 0.2 * knights
-            + 0.2 * king_shield
-        )
+    weights = get_evaluation_weights(mode)
 
-    if mode == "hard":
-        return (
-            1.0 * mat
-            + 0.7 * pst
-            + 0.5 * center
-            + 0.7 * pawns
-            + 0.4 * bishops
-            + 0.4 * rooks
-            + 0.4 * knights
-            + 0.5 * king_shield
-            + 0.8 * mobility
-            + 0.6 * king_activity
-        )
+    weighted = {}
+    total = 0.0
 
-    return (
-        1.0 * mat
-        + 0.7 * pst
-        + 0.4 * center
-        + 0.8 * pawns
-        + 0.4 * bishops
-        + 0.4 * rooks
-        + 0.4 * knights
-        + 0.4 * king_shield
-        + 0.9 * mobility
-        + 0.9 * king_activity
-        + 1.2 * edge_pressure
-    )
+    for key, value in raw.items():
+        weighted_value = value * weights[key]
+        weighted[key] = weighted_value
+        total += weighted_value
+
+    weighted["Total"] = total
+    return weighted
+
+
+def evaluate_position(gs, mode="fair"):
+    """
+    Main evaluation function.
+    Positive = White better
+    Negative = Black better
+    """
+    breakdown = evaluate_breakdown(gs, mode)
+    return breakdown["Total"]
+
+
+def print_evaluation_breakdown(gs, mode="fair"):
+    """
+    Pretty-print the weighted evaluation breakdown.
+    """
+    breakdown = evaluate_breakdown(gs, mode)
+
+    print("\nEvaluation Breakdown:")
+    for key, value in breakdown.items():
+        if key != "Total":
+            print(f"{key:15}: {value:+.2f}")
+    print("-" * 32)
+    print(f"{'Total':15}: {breakdown['Total']:+.2f}")
 
 
 def explain_move(gs_before, move, gs_after, mode="fair"):
+    """
+    Explain why the move was chosen using the change in evaluation breakdown.
+    """
     reasons = []
     phase = get_game_phase(gs_before.board)
 
-    before_eval = evaluate_position(gs_before, mode)
-    after_eval = evaluate_position(gs_after, mode)
-    delta = after_eval - before_eval
+    before = evaluate_breakdown(gs_before, mode)
+    after = evaluate_breakdown(gs_after, mode)
 
     mover_is_white = move.piece_moved[0] == "w"
+    improving_threshold = 0.08
 
     if move.piece_captured != "--":
         reasons.append(f"wins material by capturing {move.piece_captured}")
@@ -582,22 +611,89 @@ def explain_move(gs_before, move, gs_after, mode="fair"):
     if move.is_pawn_promotion:
         reasons.append(f"promotes a pawn to a {move.promotion_choice}")
 
-    if phase == "opening":
-        reasons.append("supports development and early positional control")
-    elif phase == "middlegame":
-        reasons.append("improves piece activity in the middlegame")
+    component_deltas = []
+    for key in before:
+        if key == "Total":
+            continue
+        delta = after[key] - before[key]
+        component_deltas.append((key, delta))
+
+    if mover_is_white:
+        positive_components = sorted(component_deltas, key=lambda x: x[1], reverse=True)
+        for name, delta in positive_components:
+            if delta > improving_threshold:
+                if name == "Material":
+                    reasons.append("improves the material balance")
+                elif name == "Piece-Square":
+                    reasons.append("places pieces on better squares")
+                elif name == "Center Control":
+                    reasons.append("improves central control")
+                elif name == "Pawns":
+                    reasons.append("improves the pawn structure")
+                elif name == "Bishops":
+                    reasons.append("improves bishop coordination")
+                elif name == "Rooks":
+                    reasons.append("activates the rooks")
+                elif name == "Knights":
+                    reasons.append("improves knight activity")
+                elif name == "King Shield":
+                    reasons.append("improves king safety")
+                elif name == "Mobility":
+                    reasons.append("increases move flexibility")
+                elif name == "King Activity":
+                    reasons.append("improves king activity")
+                elif name == "Edge Pressure":
+                    reasons.append("pushes the enemy king toward the edge")
+                if len(reasons) >= 4:
+                    break
     else:
-        reasons.append("strengthens endgame conversion")
+        negative_components = sorted(component_deltas, key=lambda x: x[1])
+        for name, delta in negative_components:
+            if delta < -improving_threshold:
+                if name == "Material":
+                    reasons.append("improves the material balance")
+                elif name == "Piece-Square":
+                    reasons.append("places pieces on better squares")
+                elif name == "Center Control":
+                    reasons.append("improves central control")
+                elif name == "Pawns":
+                    reasons.append("improves the pawn structure")
+                elif name == "Bishops":
+                    reasons.append("improves bishop coordination")
+                elif name == "Rooks":
+                    reasons.append("activates the rooks")
+                elif name == "Knights":
+                    reasons.append("improves knight activity")
+                elif name == "King Shield":
+                    reasons.append("improves king safety")
+                elif name == "Mobility":
+                    reasons.append("increases move flexibility")
+                elif name == "King Activity":
+                    reasons.append("improves king activity")
+                elif name == "Edge Pressure":
+                    reasons.append("pushes the enemy king toward the edge")
+                if len(reasons) >= 4:
+                    break
+
+    if phase == "opening":
+        reasons.append("fits the opening plan")
+    elif phase == "middlegame":
+        reasons.append("strengthens the middlegame position")
+    else:
+        reasons.append("improves endgame conversion")
 
     if mode == "forced":
-        reasons.append("restricts the defending king and pushes the win")
+        reasons.append("supports the forced-win strategy")
 
-    if mover_is_white and delta > 0.4:
-        reasons.append("improves White's position significantly")
-    elif not mover_is_white and delta < -0.4:
-        reasons.append("improves Black's position significantly")
+    # Remove duplicates while keeping order
+    unique_reasons = []
+    seen = set()
+    for reason in reasons:
+        if reason not in seen:
+            unique_reasons.append(reason)
+            seen.add(reason)
 
-    if not reasons:
-        reasons.append("improves the overall position")
+    if not unique_reasons:
+        return "chosen because it improves the overall position"
 
-    return "; ".join(reasons)
+    return "; ".join(unique_reasons[:5])
