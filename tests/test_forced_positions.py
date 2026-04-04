@@ -2,6 +2,10 @@
 Tests for forced-win preset positions.
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from forced_positions import get_forced_position
 
 
