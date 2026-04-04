@@ -1,6 +1,4 @@
 """
-forced_positions.py
-
 Preset positions for Forced-Win mode.
 """
 
@@ -14,11 +12,6 @@ def clear_board():
 def get_forced_position(name="kqk_black_to_move"):
     """
     Return a GameState initialized to a forced-win position.
-
-    Available:
-    - kqk_black_to_move
-    - krk_black_to_move
-    - queen_up_endgame_black_to_move
     """
     gs = GameState()
     gs.board = clear_board()
@@ -30,32 +23,33 @@ def get_forced_position(name="kqk_black_to_move"):
     gs.position_counts = {}
 
     if name == "kqk_black_to_move":
-        # White: King on h1
-        # Black: King on f3, Queen on g3
-        # Black to move from a winning endgame structure
-        gs.board[7][7] = "wK"   # h1
-        gs.board[5][5] = "bK"   # f3
-        gs.board[5][6] = "bQ"   # g3
+        # White king on h1
+        # Black king on f3
+        # Black queen on g3
+        # Black to move
+        gs.board[7][7] = "wK"
+        gs.board[5][5] = "bK"
+        gs.board[5][6] = "bQ"
 
         gs.white_king_location = (7, 7)
         gs.black_king_location = (5, 5)
         gs.white_to_move = False
 
     elif name == "krk_black_to_move":
-        gs.board[7][7] = "wK"   # h1
-        gs.board[5][5] = "bK"   # f3
-        gs.board[4][7] = "bR"   # h4
+        gs.board[7][7] = "wK"
+        gs.board[5][5] = "bK"
+        gs.board[4][7] = "bR"
 
         gs.white_king_location = (7, 7)
         gs.black_king_location = (5, 5)
         gs.white_to_move = False
 
     elif name == "queen_up_endgame_black_to_move":
-        gs.board[7][6] = "wK"   # g1
-        gs.board[6][5] = "wP"   # f2
-        gs.board[0][6] = "bK"   # g8
-        gs.board[1][4] = "bQ"   # e7
-        gs.board[2][5] = "bP"   # f6
+        gs.board[7][6] = "wK"
+        gs.board[6][5] = "wP"
+        gs.board[0][6] = "bK"
+        gs.board[1][4] = "bQ"
+        gs.board[2][5] = "bP"
 
         gs.white_king_location = (7, 6)
         gs.black_king_location = (0, 6)
