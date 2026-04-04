@@ -578,15 +578,18 @@ def evaluate_position(gs, mode="fair"):
 def print_evaluation_breakdown(gs, mode="fair"):
     """
     Pretty-print the weighted evaluation breakdown.
+    Clarifies that this is STATIC evaluation (not search).
     """
     breakdown = evaluate_breakdown(gs, mode)
 
-    print("\nEvaluation Breakdown:")
+    print("\nStatic Evaluation Breakdown (current position):")
+
     for key, value in breakdown.items():
         if key != "Total":
             print(f"{key:15}: {value:+.2f}")
+
     print("-" * 32)
-    print(f"{'Total':15}: {breakdown['Total']:+.2f}")
+    print(f"{'Static Total':15}: {breakdown['Total']:+.2f}")
 
 
 def explain_move(gs_before, move, gs_after, mode="fair"):
