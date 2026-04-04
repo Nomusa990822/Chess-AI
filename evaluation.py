@@ -16,6 +16,7 @@ Features:
 - endgame king activity
 - edge pressure in winning endgames
 - evaluation breakdown printing
+- evaluation delta printing
 - move explanation support
 """
 
@@ -208,14 +209,12 @@ def pawn_structure_score(board):
             elif board[r][c] == "bP":
                 black_pawns[c].append(r)
 
-    # Doubled pawns
     for c in range(8):
         if len(white_pawns[c]) > 1:
             score -= 0.35 * (len(white_pawns[c]) - 1)
         if len(black_pawns[c]) > 1:
             score += 0.35 * (len(black_pawns[c]) - 1)
 
-    # Isolated pawns
     for c in range(8):
         for _r in white_pawns[c]:
             isolated = True
@@ -235,7 +234,6 @@ def pawn_structure_score(board):
             if isolated:
                 score += 0.20
 
-    # Passed pawns with scaling by rank
     for c in range(8):
         for r in white_pawns[c]:
             blocked = False
@@ -269,7 +267,6 @@ def pawn_structure_score(board):
                 base_bonus = 0.10 if len(black_pawns[c]) > 1 else 0.30
                 score -= base_bonus + (advance * 0.05)
 
-    # Pawn chains
     for r in range(8):
         for c in range(8):
             if board[r][c] == "wP":
@@ -525,9 +522,6 @@ def get_evaluation_weights(mode):
 
 
 def evaluate_breakdown(gs, mode="fair"):
-    """
-    Returns a weighted breakdown of the position evaluation.
-    """
     if gs.checkmate:
         total = -9999 if gs.white_to_move else 9999
         return {"Total": total}
@@ -566,36 +560,55 @@ def evaluate_breakdown(gs, mode="fair"):
 
 
 def evaluate_position(gs, mode="fair"):
-    """
-    Main evaluation function.
-    Positive = White better
-    Negative = Black better
-    """
     breakdown = evaluate_breakdown(gs, mode)
     return breakdown["Total"]
 
 
+def format_score(value):
+    if value > 0:
+        return f"\033[92m{value:+.2f}\033[0m"
+    if value < 0:
+        return f"\033[91m{value:+.2f}\033[0m"
+    return f"{value:+.2f}"
+
+
+def compute_breakdown_delta(before_breakdown, after_breakdown):
+    delta = {}
+
+    for key in after_breakdown:
+        if key in before_breakdown:
+            delta[key] = after_breakdown[key] - before_breakdown[key]
+
+    return delta
+
+
 def print_evaluation_breakdown(gs, mode="fair"):
-    """
-    Pretty-print the weighted evaluation breakdown.
-    Clarifies that this is STATIC evaluation (not search).
-    """
     breakdown = evaluate_breakdown(gs, mode)
 
     print("\nStatic Evaluation Breakdown (current position):")
-
     for key, value in breakdown.items():
         if key != "Total":
-            print(f"{key:15}: {value:+.2f}")
+            print(f"{key:15}: {format_score(value)}")
 
-    print("-" * 32)
-    print(f"{'Static Total':15}: {breakdown['Total']:+.2f}")
+    print("-" * 36)
+    print(f"{'Static Total':15}: {format_score(breakdown['Total'])}")
+
+
+def print_evaluation_delta(gs_before, gs_after, mode="fair"):
+    before = evaluate_breakdown(gs_before, mode)
+    after = evaluate_breakdown(gs_after, mode)
+    delta = compute_breakdown_delta(before, after)
+
+    print("\nStatic Evaluation Delta (after - before):")
+    for key, value in delta.items():
+        if key != "Total":
+            print(f"{key:15}: {format_score(value)}")
+
+    print("-" * 36)
+    print(f"{'Static Total Δ':15}: {format_score(delta['Total'])}")
 
 
 def explain_move(gs_before, move, gs_after, mode="fair"):
-    """
-    Explain why the move was chosen using the change in evaluation breakdown.
-    """
     reasons = []
     phase = get_game_phase(gs_before.board)
 
@@ -622,8 +635,8 @@ def explain_move(gs_before, move, gs_after, mode="fair"):
         component_deltas.append((key, delta))
 
     if mover_is_white:
-        positive_components = sorted(component_deltas, key=lambda x: x[1], reverse=True)
-        for name, delta in positive_components:
+        ordered = sorted(component_deltas, key=lambda x: x[1], reverse=True)
+        for name, delta in ordered:
             if delta > improving_threshold:
                 if name == "Material":
                     reasons.append("improves the material balance")
@@ -650,8 +663,8 @@ def explain_move(gs_before, move, gs_after, mode="fair"):
                 if len(reasons) >= 4:
                     break
     else:
-        negative_components = sorted(component_deltas, key=lambda x: x[1])
-        for name, delta in negative_components:
+        ordered = sorted(component_deltas, key=lambda x: x[1])
+        for name, delta in ordered:
             if delta < -improving_threshold:
                 if name == "Material":
                     reasons.append("improves the material balance")
@@ -688,7 +701,6 @@ def explain_move(gs_before, move, gs_after, mode="fair"):
     if mode == "forced":
         reasons.append("supports the forced-win strategy")
 
-    # Remove duplicates while keeping order
     unique_reasons = []
     seen = set()
     for reason in reasons:
