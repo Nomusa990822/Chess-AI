@@ -6,6 +6,10 @@ Tests for the evaluation system:
 - forced-win style scoring
 """
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+
 from engine import GameState
 from evaluation import (
     evaluate_position,
