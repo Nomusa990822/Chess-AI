@@ -20,6 +20,8 @@ Features:
 - move explanation support
 """
 
+from copy import deepcopy
+
 PIECE_VALUES = {
     "K": 0.0,
     "Q": 9.0,
@@ -427,16 +429,32 @@ def king_pawn_shield_score(gs, phase):
     return score
 
 
-def mobility_score(gs):
-    current_turn = gs.white_to_move
+def safe_mobility_score(gs):
+    """
+    Compute mobility without leaving side effects on the GameState.
+    """
+    snapshot = deepcopy(gs)
 
-    gs.white_to_move = True
-    white_moves = len(gs.get_valid_moves())
+    current_turn = snapshot.white_to_move
 
-    gs.white_to_move = False
-    black_moves = len(gs.get_valid_moves())
+    current_checkmate = snapshot.checkmate
+    current_stalemate = snapshot.stalemate
+    current_draw = snapshot.draw_by_repetition
 
-    gs.white_to_move = current_turn
+    snapshot.white_to_move = True
+    white_moves = len(snapshot.get_valid_moves())
+
+    snapshot.checkmate = current_checkmate
+    snapshot.stalemate = current_stalemate
+    snapshot.draw_by_repetition = current_draw
+
+    snapshot.white_to_move = False
+    black_moves = len(snapshot.get_valid_moves())
+
+    snapshot.checkmate = current_checkmate
+    snapshot.stalemate = current_stalemate
+    snapshot.draw_by_repetition = current_draw
+    snapshot.white_to_move = current_turn
 
     return 0.05 * (white_moves - black_moves)
 
@@ -522,27 +540,32 @@ def get_evaluation_weights(mode):
 
 
 def evaluate_breakdown(gs, mode="fair"):
-    if gs.checkmate:
-        total = -9999 if gs.white_to_move else 9999
+    """
+    State-safe weighted breakdown.
+    """
+    snapshot = deepcopy(gs)
+
+    if snapshot.checkmate:
+        total = -9999 if snapshot.white_to_move else 9999
         return {"Total": total}
 
-    if gs.stalemate or gs.draw_by_repetition:
+    if snapshot.stalemate or snapshot.draw_by_repetition:
         return {"Total": 0.0}
 
-    phase = get_game_phase(gs.board)
+    phase = get_game_phase(snapshot.board)
 
     raw = {
-        "Material": material_score(gs.board),
-        "Piece-Square": piece_square_score(gs.board, phase),
-        "Center Control": center_control_score(gs.board),
-        "Pawns": pawn_structure_score(gs.board),
-        "Bishops": bishop_pair_bonus(gs.board),
-        "Rooks": rook_file_bonus(gs.board) + rook_seventh_rank_bonus(gs.board),
-        "Knights": knight_outpost_bonus(gs.board),
-        "King Shield": king_pawn_shield_score(gs, phase),
-        "Mobility": mobility_score(gs),
-        "King Activity": king_activity_score(gs, phase),
-        "Edge Pressure": edge_pressure_score(gs)
+        "Material": material_score(snapshot.board),
+        "Piece-Square": piece_square_score(snapshot.board, phase),
+        "Center Control": center_control_score(snapshot.board),
+        "Pawns": pawn_structure_score(snapshot.board),
+        "Bishops": bishop_pair_bonus(snapshot.board),
+        "Rooks": rook_file_bonus(snapshot.board) + rook_seventh_rank_bonus(snapshot.board),
+        "Knights": knight_outpost_bonus(snapshot.board),
+        "King Shield": king_pawn_shield_score(snapshot, phase),
+        "Mobility": safe_mobility_score(snapshot),
+        "King Activity": king_activity_score(snapshot, phase),
+        "Edge Pressure": edge_pressure_score(snapshot)
     }
 
     weights = get_evaluation_weights(mode)
@@ -574,11 +597,9 @@ def format_score(value):
 
 def compute_breakdown_delta(before_breakdown, after_breakdown):
     delta = {}
-
     for key in after_breakdown:
         if key in before_breakdown:
             delta[key] = after_breakdown[key] - before_breakdown[key]
-
     return delta
 
 
