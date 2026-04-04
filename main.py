@@ -193,7 +193,7 @@ def ai_turn(gs, mode):
     print(f"Quiescence nodes: {search_info['q_nodes']}")
     print(f"Prunes: {search_info['prunes']}")
     print(f"TT hits: {search_info['tt_hits']}")
-    print(f"Evaluation: {search_info['score']:.2f}")
+    print(f"Search evaluation: {search_info['score']:.2f}")
     print(f"Game phase: {search_info['phase']}")
 
     if search_info["top_lines"]:
