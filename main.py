@@ -6,13 +6,16 @@ Features:
 - Human vs AI gameplay
 - AI search report
 - Principal variation output
-- Evaluation breakdown (AI moves only)
+- Static evaluation breakdown (AI moves only)
+- Static evaluation delta (AI moves only)
 """
+
+from copy import deepcopy
 
 from engine import GameState
 from ai import choose_ai_move
 from forced_positions import get_forced_position
-from evaluation import print_evaluation_breakdown
+from evaluation import print_evaluation_breakdown, print_evaluation_delta
 from utils import (
     print_welcome_banner,
     print_board,
@@ -46,9 +49,6 @@ MODE_CONFIG = {
 
 
 def choose_mode():
-    """
-    Let the user choose a gameplay mode.
-    """
     while True:
         print("\nChoose a mode:")
         print("1. Fair Mode")
@@ -68,9 +68,6 @@ def choose_mode():
 
 
 def choose_side():
-    """
-    Let the user choose White or Black.
-    """
     while True:
         side = input("\nChoose your side (w/b): ").strip().lower()
 
@@ -81,18 +78,12 @@ def choose_side():
 
 
 def setup_game(mode):
-    """
-    Create a GameState depending on the selected mode.
-    """
     if mode == "forced":
         return get_forced_position("kqk_black_to_move")
     return GameState()
 
 
 def display_status(gs):
-    """
-    Display current board and game status.
-    """
     print_separator()
     print(f"Turn: {'White' if gs.white_to_move else 'Black'}")
     print(f"Half-moves played: {len(gs.move_log)}")
@@ -106,9 +97,6 @@ def display_status(gs):
 
 
 def human_turn(gs):
-    """
-    Handle the human player's turn.
-    """
     valid_moves = gs.get_valid_moves()
 
     while True:
@@ -159,19 +147,13 @@ def human_turn(gs):
 
 
 def ai_turn(gs, mode):
-    """
-    Handle the AI turn, including:
-    - move selection
-    - search report
-    - principal variation
-    - explanation
-    - evaluation breakdown
-    """
     config = MODE_CONFIG[mode]
     valid_moves = gs.get_valid_moves()
 
     if not valid_moves:
         return
+
+    before_position = deepcopy(gs)
 
     move, search_info = choose_ai_move(
         gs,
@@ -209,14 +191,12 @@ def ai_turn(gs, mode):
         print(color_text("\nWhy this move was chosen:", "yellow"))
         print(f"  {search_info['explanation']}")
 
-    # Print evaluation breakdown only for AI moves
+    # Print only for AI moves
     print_evaluation_breakdown(gs, mode)
+    print_evaluation_delta(before_position, gs, mode)
 
 
 def print_result(gs, human_side):
-    """
-    Print the final result and move history.
-    """
     print_separator()
     print(color_text("GAME OVER", "yellow"))
     print_board(gs.board)
@@ -247,9 +227,6 @@ def print_result(gs, human_side):
 
 
 def main():
-    """
-    Main program loop.
-    """
     print_welcome_banner()
 
     mode = choose_mode()
