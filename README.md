@@ -43,7 +43,7 @@ Unlike basic chess implementations, this engine combines:
 - Explainable AI output  
 - Full test coverage  
 
-It is not just a game — it is a **transparent decision-making system**.
+It is not just a game; it is a **transparent decision-making system**.
 
 ---
 
@@ -261,4 +261,4 @@ Nomusa Shongwe
 
 ---
 ## Final Note
-> This project shows that powerful AI does not require machine learning — it can emerge from structured reasoning, search, and well-designed evaluation.
+> This project shows that powerful AI does not require machine learning; it can emerge from structured reasoning, search, and well-designed evaluation.
