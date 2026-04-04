@@ -1,21 +1,9 @@
 """
-main.py
-
-Terminal-based Chess AI project for CS50's Introduction to AI with Python.
-
-Features:
-- Fair Mode
-- Hard Mode
-- Forced-Win Mode
-- Human vs AI
-- Legal move validation
-- Check / Checkmate / Stalemate
-- Castling, en passant, promotion
-- AI move explanations
+Entry point and game controller for the Chess AI project.
 """
 
-from engine import GameState, Move
-from ai import find_best_move
+from engine import GameState
+from ai import choose_ai_move
 from forced_positions import get_forced_position
 from utils import (
     print_welcome_banner,
@@ -23,22 +11,39 @@ from utils import (
     print_help,
     parse_user_move,
     print_mode_info,
-    color_text
+    color_text,
+    print_separator
 )
 
 WHITE = "w"
 BLACK = "b"
 
+MODE_CONFIG = {
+    "fair": {
+        "label": "Fair Mode",
+        "time_budget": 1.0,
+        "max_depth": 2
+    },
+    "hard": {
+        "label": "Hard Mode",
+        "time_budget": 2.0,
+        "max_depth": 4
+    },
+    "forced": {
+        "label": "Forced-Win Mode",
+        "time_budget": 2.5,
+        "max_depth": 5
+    }
+}
+
 
 def choose_mode():
-    """
-    Prompt the user to choose one of the available game modes.
-    """
     while True:
         print("\nChoose a mode:")
         print("1. Fair Mode")
         print("2. Hard Mode")
         print("3. Forced-Win Mode")
+
         choice = input("Enter 1, 2, or 3: ").strip()
 
         if choice == "1":
@@ -47,78 +52,44 @@ def choose_mode():
             return "hard"
         if choice == "3":
             return "forced"
+
         print(color_text("Invalid choice. Please select 1, 2, or 3.", "red"))
 
 
-def choose_side(mode):
-    """
-    Let the user choose which side to play.
-    In Forced-Win mode, the AI is black by default in the provided setups,
-    so the user will generally play white unless the selected position says otherwise.
-    """
+def choose_side():
     while True:
-        choice = input("\nChoose your side (w/b): ").strip().lower()
-        if choice in ("w", "b"):
-            return choice
-        print(color_text("Invalid choice. Please enter 'w' or 'b'.", "red"))
+        side = input("\nChoose your side (w/b): ").strip().lower()
+        if side in ("w", "b"):
+            return side
+        print(color_text("Invalid side. Enter 'w' or 'b'.", "red"))
 
 
 def setup_game(mode):
-    """
-    Create a GameState based on the selected mode.
-    """
     if mode == "forced":
-        gs = get_forced_position("kqk_black_to_move")
-    else:
-        gs = GameState()
-
-    return gs
+        return get_forced_position("kqk_black_to_move")
+    return GameState()
 
 
-def get_ai_config(mode):
-    """
-    Return search depth and descriptive label for each mode.
-    """
-    if mode == "fair":
-        return {
-            "depth": 2,
-            "name": "Fair Mode AI"
-        }
-    if mode == "hard":
-        return {
-            "depth": 3,
-            "name": "Hard Mode AI"
-        }
-    return {
-        "depth": 4,
-        "name": "Forced-Win AI"
-    }
-
-
-def print_game_status(gs):
-    """
-    Print current high-level game status.
-    """
-    print("\n" + "=" * 70)
+def display_status(gs):
+    print_separator()
     print(f"Turn: {'White' if gs.white_to_move else 'Black'}")
-    print(f"Move number: {len(gs.move_log) + 1}")
+    print(f"Half-moves played: {len(gs.move_log)}")
     print_board(gs.board)
-    print("=" * 70)
 
     if gs.in_check(gs.white_to_move):
         print(color_text("CHECK!", "yellow"))
 
+    if gs.draw_by_repetition:
+        print(color_text("Current state is repeated.", "yellow"))
 
-def handle_human_turn(gs):
-    """
-    Handle human input until a valid move is made or the user exits.
-    """
+
+def human_turn(gs):
     valid_moves = gs.get_valid_moves()
 
     while True:
-        print("\nEnter your move in coordinate form, e.g. e2e4")
+        print("\nEnter move like e2e4")
         print("Promotion example: e7e8q")
-        print("Type 'help' for instructions, 'moves' to list legal moves, or 'quit' to exit.")
+        print("Commands: help, moves, undo, quit")
 
         user_input = input("Your move: ").strip().lower()
 
@@ -131,18 +102,26 @@ def handle_human_turn(gs):
 
         if user_input == "moves":
             print("\nLegal moves:")
-            for mv in valid_moves:
-                print(f" - {mv.get_chess_notation()}")
+            for move in valid_moves:
+                print(f" - {move.get_chess_notation()}")
             continue
 
-        move = parse_user_move(user_input, gs.board)
-        if move is None:
-            print(color_text("Invalid input format. Try something like e2e4.", "red"))
+        if user_input == "undo":
+            if len(gs.move_log) >= 2:
+                gs.undo_move()
+                gs.undo_move()
+                return "undone"
+            print(color_text("Not enough moves to undo.", "red"))
+            continue
+
+        parsed_move = parse_user_move(user_input, gs.board)
+        if parsed_move is None:
+            print(color_text("Invalid move format.", "red"))
             continue
 
         matched_move = None
         for valid_move in valid_moves:
-            if move == valid_move:
+            if parsed_move == valid_move:
                 matched_move = valid_move
                 break
 
@@ -150,55 +129,70 @@ def handle_human_turn(gs):
             gs.make_move(matched_move)
             return "moved"
 
-        print(color_text("Illegal move. Try again.", "red"))
+        print(color_text("Illegal move.", "red"))
 
 
-def handle_ai_turn(gs, mode):
-    """
-    Ask the AI for the best move and play it.
-    """
-    config = get_ai_config(mode)
+def ai_turn(gs, mode):
+    config = MODE_CONFIG[mode]
     valid_moves = gs.get_valid_moves()
 
     if not valid_moves:
         return
 
-    best_move, stats = find_best_move(gs, valid_moves, depth=config["depth"], mode=mode)
+    move, search_info = choose_ai_move(
+        gs,
+        valid_moves,
+        mode=mode,
+        max_depth=config["max_depth"],
+        time_budget=config["time_budget"]
+    )
 
-    if best_move is None:
-        # Fallback just in case
-        best_move = valid_moves[0]
+    if move is None:
+        move = valid_moves[0]
 
-    gs.make_move(best_move)
+    gs.make_move(move)
 
-    print(color_text(f"\n{config['name']} plays: {best_move.get_chess_notation()}", "cyan"))
-    print(f"AI evaluation: {stats.get('score', 0):.2f}")
-    print(f"Nodes explored: {stats.get('nodes', 0)}")
+    print(color_text(f"\nAI plays: {move.get_chess_notation()}", "cyan"))
+    print(color_text("AI Search Report", "blue"))
+    print(f"Depth reached: {search_info['depth_reached']}")
+    print(f"Nodes explored: {search_info['nodes']}")
+    print(f"Quiescence nodes: {search_info['q_nodes']}")
+    print(f"Prunes: {search_info['prunes']}")
+    print(f"TT hits: {search_info['tt_hits']}")
+    print(f"Evaluation: {search_info['score']:.2f}")
+    print(f"Game phase: {search_info['phase']}")
 
-    explanation = stats.get("explanation")
-    if explanation:
-        print(color_text(f"AI explanation: {explanation}", "blue"))
+    if search_info["top_lines"]:
+        print("\nTop candidate moves:")
+        for idx, entry in enumerate(search_info["top_lines"], start=1):
+            print(f"  {idx}. {entry['move']} -> {entry['score']:.2f}")
+
+    if search_info["principal_variation"]:
+        print("\nBest line (Principal Variation):")
+        print("  " + " -> ".join(search_info["principal_variation"]))
+
+    if search_info["explanation"]:
+        print(color_text("\nWhy this move?", "yellow"))
+        print(f"  {search_info['explanation']}")
 
 
 def print_result(gs, human_side):
-    """
-    Print the final game result.
-    """
-    print("\n" + "=" * 70)
-    print("GAME OVER")
+    print_separator()
+    print(color_text("GAME OVER", "yellow"))
     print_board(gs.board)
 
     if gs.checkmate:
         winner = "Black" if gs.white_to_move else "White"
         print(color_text(f"Checkmate! {winner} wins.", "green"))
 
-        if (winner == "White" and human_side == "w") or (winner == "Black" and human_side == "b"):
-            print(color_text("Congratulations — you defeated the AI.", "green"))
+        user_won = (winner == "White" and human_side == "w") or (winner == "Black" and human_side == "b")
+        if user_won:
+            print(color_text("You defeated the AI.", "green"))
         else:
-            print(color_text("The AI wins this game.", "cyan"))
+            print(color_text("The AI wins.", "cyan"))
 
     elif gs.stalemate:
-        print(color_text("Stalemate! The game is a draw.", "yellow"))
+        print(color_text("Stalemate. Draw.", "yellow"))
 
     elif gs.draw_by_repetition:
         print(color_text("Draw by repetition.", "yellow"))
@@ -208,14 +202,11 @@ def print_result(gs, human_side):
 
     print("\nMove history:")
     for i, move in enumerate(gs.move_log, start=1):
-        prefix = f"{(i + 1) // 2}." if i % 2 == 1 else "..."
-        print(f"{prefix} {move.get_chess_notation()}")
+        turn_marker = f"{(i + 1) // 2}." if i % 2 == 1 else "..."
+        print(f"{turn_marker} {move.get_chess_notation()}")
 
 
 def main():
-    """
-    Main game loop.
-    """
     print_welcome_banner()
 
     mode = choose_mode()
@@ -224,12 +215,12 @@ def main():
     gs = setup_game(mode)
 
     if mode == "forced":
-        print(color_text("\nForced-Win Mode starts from a pre-configured winning position for the AI.", "yellow"))
+        print(color_text("\nForced-Win Mode starts from a winning position for the AI.", "yellow"))
 
-    human_side = choose_side(mode)
+    human_side = choose_side()
     ai_side = BLACK if human_side == WHITE else WHITE
 
-    print(color_text(f"\nYou are playing as {'White' if human_side == WHITE else 'Black'}.", "green"))
+    print(color_text(f"\nYou are {'White' if human_side == WHITE else 'Black'}.", "green"))
     print(color_text(f"AI is {'White' if ai_side == WHITE else 'Black'}.", "cyan"))
 
     while True:
@@ -238,17 +229,17 @@ def main():
         if gs.checkmate or gs.stalemate or gs.draw_by_repetition:
             break
 
-        print_game_status(gs)
+        display_status(gs)
 
         current_side = WHITE if gs.white_to_move else BLACK
 
         if current_side == human_side:
-            result = handle_human_turn(gs)
-            if result == "quit":
-                print(color_text("\nGame exited by user.", "yellow"))
+            outcome = human_turn(gs)
+            if outcome == "quit":
+                print(color_text("Game exited.", "yellow"))
                 return
         else:
-            handle_ai_turn(gs, mode)
+            ai_turn(gs, mode)
 
     print_result(gs, human_side)
 
