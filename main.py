@@ -191,7 +191,6 @@ def ai_turn(gs, mode):
         print(color_text("\nWhy this move was chosen:", "yellow"))
         print(f"  {search_info['explanation']}")
 
-    # Print only for AI moves
     print_evaluation_breakdown(gs, mode)
     print_evaluation_delta(before_position, gs, mode)
 
