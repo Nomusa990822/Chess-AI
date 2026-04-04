@@ -1,21 +1,15 @@
 """
-Stronger position evaluation for the Chess AI project.
+Position evaluation for the Chess AI project.
 
-Includes:
+Features:
 - material
 - piece-square tables
 - center control
-- pawn structure:
-    * doubled pawns
-    * isolated pawns
-    * pawn chains
-    * passed pawns scaled by rank
-- bishop pair
-- rook activity
+- advanced pawn structure evaluation
 - mobility
 - game phase awareness
-- king safety / king activity
-- endgame conversion pressure
+- endgame king activity
+- edge pressure in winning endgames
 """
 
 PIECE_VALUES = {
@@ -118,6 +112,9 @@ def mirrored_row(row):
 
 
 def get_game_phase(board):
+    """
+    Classify the position into opening, middlegame, or endgame.
+    """
     total_material = 0.0
     for row in board:
         for piece in row:
@@ -132,16 +129,24 @@ def get_game_phase(board):
 
 
 def material_score(board):
+    """
+    Simple material count.
+    Positive means White is ahead, negative means Black is ahead.
+    """
     score = 0.0
     for row in board:
         for piece in row:
             if piece == "--":
                 continue
-            score += PIECE_VALUES[piece[1]] if piece[0] == "w" else -PIECE_VALUES[piece[1]]
+            value = PIECE_VALUES[piece[1]]
+            score += value if piece[0] == "w" else -value
     return score
 
 
 def piece_square_score(board, phase):
+    """
+    Positional bonuses based on piece placement.
+    """
     score = 0.0
 
     for r in range(8):
@@ -178,23 +183,42 @@ def piece_square_score(board, phase):
 
 
 def center_control_score(board):
+    """
+    Reward presence in the center and extended center.
+    """
     score = 0.0
     for r in range(8):
         for c in range(8):
             piece = board[r][c]
             if piece == "--":
                 continue
+
             if (r, c) in CENTER_SQUARES:
                 score += 0.25 if piece[0] == "w" else -0.25
             elif (r, c) in EXTENDED_CENTER:
-                score += 0.1 if piece[0] == "w" else -0.1
+                score += 0.10 if piece[0] == "w" else -0.10
+
     return score
 
 
-def build_pawn_maps(board):
+def pawn_structure_score(board):
+    """
+    Evaluate pawn structure.
+
+    Included features:
+    - doubled pawn penalty
+    - isolated pawn penalty
+    - pawn chain bonus
+    - passed pawn bonus
+    - reduced passed-pawn bonus for doubled pawns
+    - passed pawn scaling by rank
+    """
+    score = 0.0
+
     white_pawns = {c: [] for c in range(8)}
     black_pawns = {c: [] for c in range(8)}
 
+    # Collect pawn positions by file
     for r in range(8):
         for c in range(8):
             if board[r][c] == "wP":
@@ -202,68 +226,49 @@ def build_pawn_maps(board):
             elif board[r][c] == "bP":
                 black_pawns[c].append(r)
 
-    return white_pawns, black_pawns
-
-
-def is_isolated(file_index, pawn_map):
-    left_empty = (file_index - 1 < 0) or (len(pawn_map[file_index - 1]) == 0)
-    right_empty = (file_index + 1 > 7) or (len(pawn_map[file_index + 1]) == 0)
-    return left_empty and right_empty
-
-
-def has_white_chain_support(r, c, board):
-    supporters = []
-    if r + 1 < 8 and c - 1 >= 0:
-        supporters.append(board[r + 1][c - 1] == "wP")
-    if r + 1 < 8 and c + 1 < 8:
-        supporters.append(board[r + 1][c + 1] == "wP")
-    return any(supporters)
-
-
-def has_black_chain_support(r, c, board):
-    supporters = []
-    if r - 1 >= 0 and c - 1 >= 0:
-        supporters.append(board[r - 1][c - 1] == "bP")
-    if r - 1 >= 0 and c + 1 < 8:
-        supporters.append(board[r - 1][c + 1] == "bP")
-    return any(supporters)
-
-
-def white_passed_pawn_bonus(r):
-    advancement = 6 - r
-    return 0.15 + advancement * 0.06
-
-
-def black_passed_pawn_bonus(r):
-    advancement = r - 1
-    return 0.15 + advancement * 0.06
-
-
-def pawn_structure_score(board):
-    score = 0.0
-    white_pawns, black_pawns = build_pawn_maps(board)
-
-    # Doubled pawns
+    # -------------------------------------------------
+    # 1. Doubled pawn penalty
+    # -------------------------------------------------
     for c in range(8):
         if len(white_pawns[c]) > 1:
             score -= 0.35 * (len(white_pawns[c]) - 1)
+
         if len(black_pawns[c]) > 1:
             score += 0.35 * (len(black_pawns[c]) - 1)
 
-    # Isolated pawns
-    for c in range(8):
-        if white_pawns[c] and is_isolated(c, white_pawns):
-            score -= 0.20 * len(white_pawns[c])
-        if black_pawns[c] and is_isolated(c, black_pawns):
-            score += 0.20 * len(black_pawns[c])
-
-    # White pawn features
+    # -------------------------------------------------
+    # 2. Isolated pawn penalty
+    # A pawn is isolated if there are no friendly pawns
+    # on the adjacent files.
+    # -------------------------------------------------
     for c in range(8):
         for r in white_pawns[c]:
-            doubled = len(white_pawns[c]) > 1
+            isolated = True
+            for adj in (c - 1, c + 1):
+                if 0 <= adj < 8 and len(white_pawns[adj]) > 0:
+                    isolated = False
+                    break
+            if isolated:
+                score -= 0.20
 
-            # Passed pawn
+        for r in black_pawns[c]:
+            isolated = True
+            for adj in (c - 1, c + 1):
+                if 0 <= adj < 8 and len(black_pawns[adj]) > 0:
+                    isolated = False
+                    break
+            if isolated:
+                score += 0.20
+
+    # -------------------------------------------------
+    # 3. Passed pawn bonus with scaling by rank
+    # A pawn is passed if no enemy pawns are ahead of it
+    # on the same or adjacent files.
+    # -------------------------------------------------
+    for c in range(8):
+        for r in white_pawns[c]:
             blocked = False
+
             for adj in (c - 1, c, c + 1):
                 if 0 <= adj < 8:
                     for br in black_pawns[adj]:
@@ -274,21 +279,13 @@ def pawn_structure_score(board):
                     break
 
             if not blocked:
-                bonus = white_passed_pawn_bonus(r)
-                if doubled:
-                    bonus *= 0.45
-                score += bonus
+                advance = 7 - r  # larger means more advanced for White
+                base_bonus = 0.10 if len(white_pawns[c]) > 1 else 0.30
+                score += base_bonus + (advance * 0.05)
 
-            # Pawn chain bonus
-            if has_white_chain_support(r, c, board):
-                score += 0.10
-
-    # Black pawn features
-    for c in range(8):
         for r in black_pawns[c]:
-            doubled = len(black_pawns[c]) > 1
-
             blocked = False
+
             for adj in (c - 1, c, c + 1):
                 if 0 <= adj < 8:
                     for wr in white_pawns[adj]:
@@ -299,102 +296,39 @@ def pawn_structure_score(board):
                     break
 
             if not blocked:
-                bonus = black_passed_pawn_bonus(r)
-                if doubled:
-                    bonus *= 0.45
-                score -= bonus
+                advance = r  # larger means more advanced for Black
+                base_bonus = 0.10 if len(black_pawns[c]) > 1 else 0.30
+                score -= base_bonus + (advance * 0.05)
 
-            if has_black_chain_support(r, c, board):
-                score -= 0.10
-
-    return score
-
-
-def bishop_pair_score(board):
-    white_bishops = 0
-    black_bishops = 0
-
-    for row in board:
-        for piece in row:
-            if piece == "wB":
-                white_bishops += 1
-            elif piece == "bB":
-                black_bishops += 1
-
-    score = 0.0
-    if white_bishops >= 2:
-        score += 0.30
-    if black_bishops >= 2:
-        score -= 0.30
-    return score
-
-
-def rook_activity_score(board):
-    score = 0.0
-    white_pawns, black_pawns = build_pawn_maps(board)
-
+    # -------------------------------------------------
+    # 4. Pawn chain bonus
+    # Reward pawns supported diagonally by another pawn.
+    # -------------------------------------------------
     for r in range(8):
         for c in range(8):
-            piece = board[r][c]
-            if piece == "--" or piece[1] != "R":
-                continue
+            if board[r][c] == "wP":
+                for dc in (-1, 1):
+                    support_col = c + dc
+                    support_row = r + 1
+                    if 0 <= support_col < 8 and 0 <= support_row < 8:
+                        if board[support_row][support_col] == "wP":
+                            score += 0.15
 
-            own_pawns = white_pawns if piece[0] == "w" else black_pawns
-            opp_pawns = black_pawns if piece[0] == "w" else white_pawns
-
-            own_file_empty = len(own_pawns[c]) == 0
-            opp_file_empty = len(opp_pawns[c]) == 0
-
-            bonus = 0.0
-            if own_file_empty and opp_file_empty:
-                bonus += 0.30  # open file
-            elif own_file_empty:
-                bonus += 0.18  # semi-open file
-
-            if piece[0] == "w" and r == 1:
-                bonus += 0.20  # 7th rank
-            if piece[0] == "b" and r == 6:
-                bonus += 0.20  # 2nd rank from black perspective
-
-            score += bonus if piece[0] == "w" else -bonus
-
-    return score
-
-
-def knight_outpost_score(board):
-    score = 0.0
-
-    for r in range(8):
-        for c in range(8):
-            piece = board[r][c]
-            if piece not in ("wN", "bN"):
-                continue
-
-            if piece == "wN":
-                if r in (2, 3, 4) and c in (2, 3, 4, 5):
-                    # supported by pawn?
-                    supported = False
-                    if r + 1 < 8 and c - 1 >= 0 and board[r + 1][c - 1] == "wP":
-                        supported = True
-                    if r + 1 < 8 and c + 1 < 8 and board[r + 1][c + 1] == "wP":
-                        supported = True
-                    if supported:
-                        score += 0.20
-
-            if piece == "bN":
-                if r in (3, 4, 5) and c in (2, 3, 4, 5):
-                    supported = False
-                    if r - 1 >= 0 and c - 1 >= 0 and board[r - 1][c - 1] == "bP":
-                        supported = True
-                    if r - 1 >= 0 and c + 1 < 8 and board[r - 1][c + 1] == "bP":
-                        supported = True
-                    if supported:
-                        score -= 0.20
+            elif board[r][c] == "bP":
+                for dc in (-1, 1):
+                    support_col = c + dc
+                    support_row = r - 1
+                    if 0 <= support_col < 8 and 0 <= support_row < 8:
+                        if board[support_row][support_col] == "bP":
+                            score -= 0.15
 
     return score
 
 
 def mobility_score(gs):
+    """
+    Reward having more legal moves than the opponent.
+    """
     current_turn = gs.white_to_move
 
     gs.white_to_move = True
@@ -408,37 +342,11 @@ def mobility_score(gs):
     return 0.05 * (white_moves - black_moves)
 
 
-def king_safety_score(gs, phase):
-    if phase == "endgame":
-        return 0.0
-
-    score = 0.0
-
-    wk_r, wk_c = gs.white_king_location
-    bk_r, bk_c = gs.black_king_location
-
-    # Penalize central kings in opening / middlegame
-    white_penalty = 0.0
-    black_penalty = 0.0
-
-    if wk_c in (3, 4) and wk_r > 1:
-        white_penalty += 0.25
-    if bk_c in (3, 4) and bk_r < 6:
-        black_penalty += 0.25
-
-    # Slight reward if king looks castled
-    if (wk_r, wk_c) in ((7, 6), (7, 2)):
-        white_penalty -= 0.15
-    if (bk_r, bk_c) in ((0, 6), (0, 2)):
-        black_penalty -= 0.15
-
-    score -= white_penalty
-    score += black_penalty
-
-    return score
-
-
 def king_activity_score(gs, phase):
+    """
+    In the endgame, active kings matter much more.
+    Reward the stronger side's king moving closer to the enemy king.
+    """
     if phase != "endgame":
         return 0.0
 
@@ -455,29 +363,11 @@ def king_activity_score(gs, phase):
     return 0.0
 
 
-def enemy_king_escape_squares(gs, white_attacking):
-    if white_attacking:
-        kr, kc = gs.black_king_location
-        enemy_is_white = False
-    else:
-        kr, kc = gs.white_king_location
-        enemy_is_white = True
-
-    escape_count = 0
-    for dr in (-1, 0, 1):
-        for dc in (-1, 0, 1):
-            if dr == 0 and dc == 0:
-                continue
-            r, c = kr + dr, kc + dc
-            if 0 <= r < 8 and 0 <= c < 8:
-                piece = gs.board[r][c]
-                if piece == "--" or (piece[0] == ("w" if enemy_is_white else "b")):
-                    if not gs.square_under_attack(r, c, attacking_white=white_attacking):
-                        escape_count += 1
-    return escape_count
-
-
 def edge_pressure_score(gs):
+    """
+    Reward pushing the weaker king toward the edge in winning endgames.
+    Useful especially in Forced-Win mode.
+    """
     def edge_bonus(row, col):
         return max(abs(3.5 - row), abs(3.5 - col))
 
@@ -486,20 +376,20 @@ def edge_pressure_score(gs):
 
     if mat > 1.0:
         br, bc = gs.black_king_location
-        score += edge_bonus(br, bc) * 0.2
-        score += (8 - enemy_king_escape_squares(gs, white_attacking=True)) * 0.05
+        score += edge_bonus(br, bc) * 0.20
     elif mat < -1.0:
         wr, wc = gs.white_king_location
-        score -= edge_bonus(wr, wc) * 0.2
-        score -= (8 - enemy_king_escape_squares(gs, white_attacking=False)) * 0.05
+        score -= edge_bonus(wr, wc) * 0.20
 
     return score
 
 
 def evaluate_position(gs, mode="fair"):
     """
-    Positive = White better
-    Negative = Black better
+    Main evaluation function.
+
+    Positive score = White better
+    Negative score = Black better
     """
     if gs.checkmate:
         return -9999 if gs.white_to_move else 9999
@@ -513,11 +403,7 @@ def evaluate_position(gs, mode="fair"):
     pst = piece_square_score(gs.board, phase)
     center = center_control_score(gs.board)
     pawns = pawn_structure_score(gs.board)
-    bishops = bishop_pair_score(gs.board)
-    rooks = rook_activity_score(gs.board)
-    outposts = knight_outpost_score(gs.board)
     mobility = mobility_score(gs)
-    king_safety = king_safety_score(gs, phase)
     king_activity = king_activity_score(gs, phase)
     edge_pressure = edge_pressure_score(gs)
 
@@ -526,11 +412,7 @@ def evaluate_position(gs, mode="fair"):
             1.0 * mat
             + 0.6 * pst
             + 0.4 * center
-            + 0.7 * pawns
-            + 0.3 * bishops
-            + 0.2 * rooks
-            + 0.2 * outposts
-            + 0.2 * king_safety
+            + 0.5 * pawns
         )
 
     if mode == "hard":
@@ -538,31 +420,27 @@ def evaluate_position(gs, mode="fair"):
             1.0 * mat
             + 0.7 * pst
             + 0.5 * center
-            + 0.9 * pawns
-            + 0.4 * bishops
-            + 0.35 * rooks
-            + 0.25 * outposts
+            + 0.7 * pawns
             + 0.8 * mobility
-            + 0.45 * king_safety
             + 0.6 * king_activity
         )
 
+    # forced-win mode
     return (
         1.0 * mat
         + 0.7 * pst
         + 0.4 * center
-        + 1.0 * pawns
-        + 0.4 * bishops
-        + 0.35 * rooks
-        + 0.25 * outposts
+        + 0.8 * pawns
         + 0.9 * mobility
-        + 0.35 * king_safety
         + 0.9 * king_activity
         + 1.2 * edge_pressure
     )
 
 
 def explain_move(gs_before, move, gs_after, mode="fair"):
+    """
+    Generate a readable explanation for the AI's chosen move.
+    """
     reasons = []
     phase = get_game_phase(gs_before.board)
 
@@ -582,18 +460,18 @@ def explain_move(gs_before, move, gs_after, mode="fair"):
         reasons.append(f"promotes a pawn to a {move.promotion_choice}")
 
     if phase == "opening":
-        reasons.append("supports development and positional control")
+        reasons.append("supports development and early positional control")
     elif phase == "middlegame":
-        reasons.append("improves piece activity and coordination")
+        reasons.append("improves piece activity in the middlegame")
     else:
         reasons.append("strengthens endgame conversion")
 
     if mode == "forced":
-        reasons.append("restricts the defending king and presses the winning plan")
+        reasons.append("restricts the defending king and pushes the win")
 
     if mover_is_white and delta > 0.4:
         reasons.append("improves White's position significantly")
-    elif (not mover_is_white) and delta < -0.4:
+    elif not mover_is_white and delta < -0.4:
         reasons.append("improves Black's position significantly")
 
     if not reasons:
