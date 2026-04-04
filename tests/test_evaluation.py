@@ -123,21 +123,39 @@ def test_center_control_improves_score_for_black_negative():
     assert score < 0
 
 
-def test_pawn_structure_penalizes_doubled_white_pawns():
+def test_doubled_white_pawns_score_worse_than_single_white_pawn():
     """
-    Doubled white pawns should reduce White's pawn structure score.
+    A doubled white pawn structure should score worse than a single white pawn
+    on the same file.
     """
-    gs = GameState()
-    gs.board = [["--" for _ in range(8)] for _ in range(8)]
+    # Position A: single white pawn
+    gs_single = GameState()
+    gs_single.board = [["--" for _ in range(8)] for _ in range(8)]
 
-    gs.board[7][4] = "wK"
-    gs.board[0][4] = "bK"
+    gs_single.board[7][4] = "wK"
+    gs_single.board[0][4] = "bK"
+    gs_single.white_king_location = (7, 4)
+    gs_single.black_king_location = (0, 4)
 
-    gs.board[6][0] = "wP"
-    gs.board[5][0] = "wP"
+    gs_single.board[6][0] = "wP"
 
-    score = pawn_structure_score(gs.board)
-    assert score < 0
+    single_score = pawn_structure_score(gs_single.board)
+
+    # Position B: doubled white pawns
+    gs_doubled = GameState()
+    gs_doubled.board = [["--" for _ in range(8)] for _ in range(8)]
+
+    gs_doubled.board[7][4] = "wK"
+    gs_doubled.board[0][4] = "bK"
+    gs_doubled.white_king_location = (7, 4)
+    gs_doubled.black_king_location = (0, 4)
+
+    gs_doubled.board[6][0] = "wP"
+    gs_doubled.board[5][0] = "wP"
+
+    doubled_score = pawn_structure_score(gs_doubled.board)
+
+    assert doubled_score < single_score
 
 
 def test_forced_style_position_favors_black():
