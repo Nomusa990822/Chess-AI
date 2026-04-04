@@ -1,5 +1,5 @@
 """
-Position evaluation for the Chess AI project.
+Advanced position evaluation for the Chess AI project.
 
 Features:
 - material
@@ -8,6 +8,11 @@ Features:
 - advanced pawn structure evaluation
 - mobility
 - game phase awareness
+- bishop pair bonus
+- rook open/semi-open file bonus
+- rook on 7th rank bonus
+- knight outpost bonus
+- king pawn shield
 - endgame king activity
 - edge pressure in winning endgames
 """
@@ -112,9 +117,6 @@ def mirrored_row(row):
 
 
 def get_game_phase(board):
-    """
-    Classify the position into opening, middlegame, or endgame.
-    """
     total_material = 0.0
     for row in board:
         for piece in row:
@@ -129,10 +131,6 @@ def get_game_phase(board):
 
 
 def material_score(board):
-    """
-    Simple material count.
-    Positive means White is ahead, negative means Black is ahead.
-    """
     score = 0.0
     for row in board:
         for piece in row:
@@ -144,9 +142,6 @@ def material_score(board):
 
 
 def piece_square_score(board, phase):
-    """
-    Positional bonuses based on piece placement.
-    """
     score = 0.0
 
     for r in range(8):
@@ -183,9 +178,6 @@ def piece_square_score(board, phase):
 
 
 def center_control_score(board):
-    """
-    Reward presence in the center and extended center.
-    """
     score = 0.0
     for r in range(8):
         for c in range(8):
@@ -202,23 +194,11 @@ def center_control_score(board):
 
 
 def pawn_structure_score(board):
-    """
-    Evaluate pawn structure.
-
-    Included features:
-    - doubled pawn penalty
-    - isolated pawn penalty
-    - pawn chain bonus
-    - passed pawn bonus
-    - reduced passed-pawn bonus for doubled pawns
-    - passed pawn scaling by rank
-    """
     score = 0.0
 
     white_pawns = {c: [] for c in range(8)}
     black_pawns = {c: [] for c in range(8)}
 
-    # Collect pawn positions by file
     for r in range(8):
         for c in range(8):
             if board[r][c] == "wP":
@@ -226,23 +206,16 @@ def pawn_structure_score(board):
             elif board[r][c] == "bP":
                 black_pawns[c].append(r)
 
-    # -------------------------------------------------
-    # 1. Doubled pawn penalty
-    # -------------------------------------------------
+    # Doubled pawns
     for c in range(8):
         if len(white_pawns[c]) > 1:
             score -= 0.35 * (len(white_pawns[c]) - 1)
-
         if len(black_pawns[c]) > 1:
             score += 0.35 * (len(black_pawns[c]) - 1)
 
-    # -------------------------------------------------
-    # 2. Isolated pawn penalty
-    # A pawn is isolated if there are no friendly pawns
-    # on the adjacent files.
-    # -------------------------------------------------
+    # Isolated pawns
     for c in range(8):
-        for r in white_pawns[c]:
+        for _r in white_pawns[c]:
             isolated = True
             for adj in (c - 1, c + 1):
                 if 0 <= adj < 8 and len(white_pawns[adj]) > 0:
@@ -251,7 +224,7 @@ def pawn_structure_score(board):
             if isolated:
                 score -= 0.20
 
-        for r in black_pawns[c]:
+        for _r in black_pawns[c]:
             isolated = True
             for adj in (c - 1, c + 1):
                 if 0 <= adj < 8 and len(black_pawns[adj]) > 0:
@@ -260,15 +233,10 @@ def pawn_structure_score(board):
             if isolated:
                 score += 0.20
 
-    # -------------------------------------------------
-    # 3. Passed pawn bonus with scaling by rank
-    # A pawn is passed if no enemy pawns are ahead of it
-    # on the same or adjacent files.
-    # -------------------------------------------------
+    # Passed pawns with scaling by rank
     for c in range(8):
         for r in white_pawns[c]:
             blocked = False
-
             for adj in (c - 1, c, c + 1):
                 if 0 <= adj < 8:
                     for br in black_pawns[adj]:
@@ -279,13 +247,12 @@ def pawn_structure_score(board):
                     break
 
             if not blocked:
-                advance = 7 - r  # larger means more advanced for White
+                advance = 7 - r
                 base_bonus = 0.10 if len(white_pawns[c]) > 1 else 0.30
                 score += base_bonus + (advance * 0.05)
 
         for r in black_pawns[c]:
             blocked = False
-
             for adj in (c - 1, c, c + 1):
                 if 0 <= adj < 8:
                     for wr in white_pawns[adj]:
@@ -296,14 +263,11 @@ def pawn_structure_score(board):
                     break
 
             if not blocked:
-                advance = r  # larger means more advanced for Black
+                advance = r
                 base_bonus = 0.10 if len(black_pawns[c]) > 1 else 0.30
                 score -= base_bonus + (advance * 0.05)
 
-    # -------------------------------------------------
-    # 4. Pawn chain bonus
-    # Reward pawns supported diagonally by another pawn.
-    # -------------------------------------------------
+    # Pawn chains
     for r in range(8):
         for c in range(8):
             if board[r][c] == "wP":
@@ -325,10 +289,171 @@ def pawn_structure_score(board):
     return score
 
 
+def bishop_pair_bonus(board):
+    white_bishops = 0
+    black_bishops = 0
+
+    for row in board:
+        for piece in row:
+            if piece == "wB":
+                white_bishops += 1
+            elif piece == "bB":
+                black_bishops += 1
+
+    score = 0.0
+    if white_bishops >= 2:
+        score += 0.35
+    if black_bishops >= 2:
+        score -= 0.35
+    return score
+
+
+def rook_file_bonus(board):
+    """
+    Reward rooks on open and semi-open files.
+    Open file: no pawns of either color.
+    Semi-open file: no friendly pawn, but at least one enemy pawn.
+    """
+    score = 0.0
+
+    for c in range(8):
+        white_pawn_on_file = False
+        black_pawn_on_file = False
+        white_rooks = 0
+        black_rooks = 0
+
+        for r in range(8):
+            piece = board[r][c]
+            if piece == "wP":
+                white_pawn_on_file = True
+            elif piece == "bP":
+                black_pawn_on_file = True
+            elif piece == "wR":
+                white_rooks += 1
+            elif piece == "bR":
+                black_rooks += 1
+
+        # White rook bonuses
+        if white_rooks > 0:
+            if not white_pawn_on_file and not black_pawn_on_file:
+                score += 0.30 * white_rooks
+            elif not white_pawn_on_file and black_pawn_on_file:
+                score += 0.15 * white_rooks
+
+        # Black rook bonuses
+        if black_rooks > 0:
+            if not white_pawn_on_file and not black_pawn_on_file:
+                score -= 0.30 * black_rooks
+            elif not black_pawn_on_file and white_pawn_on_file:
+                score -= 0.15 * black_rooks
+
+    return score
+
+
+def rook_seventh_rank_bonus(board):
+    """
+    Reward rooks penetrating to the 7th rank.
+    White rook on row 1, black rook on row 6.
+    """
+    score = 0.0
+
+    for c in range(8):
+        if board[1][c] == "wR":
+            score += 0.20
+        if board[6][c] == "bR":
+            score -= 0.20
+
+    return score
+
+
+def knight_outpost_bonus(board):
+    """
+    Reward knights on protected advanced squares that cannot easily be challenged by enemy pawns.
+    """
+    score = 0.0
+
+    for r in range(8):
+        for c in range(8):
+            piece = board[r][c]
+
+            if piece == "wN":
+                # White outpost squares generally in enemy half
+                if r <= 4:
+                    supported = False
+                    for dc in (-1, 1):
+                        sr = r + 1
+                        sc = c + dc
+                        if 0 <= sr < 8 and 0 <= sc < 8 and board[sr][sc] == "wP":
+                            supported = True
+
+                    enemy_pawn_can_chase = False
+                    for dc in (-1, 1):
+                        er = r - 1
+                        ec = c + dc
+                        if 0 <= er < 8 and 0 <= ec < 8 and board[er][ec] == "bP":
+                            enemy_pawn_can_chase = True
+
+                    if supported and not enemy_pawn_can_chase:
+                        score += 0.25
+
+            elif piece == "bN":
+                if r >= 3:
+                    supported = False
+                    for dc in (-1, 1):
+                        sr = r - 1
+                        sc = c + dc
+                        if 0 <= sr < 8 and 0 <= sc < 8 and board[sr][sc] == "bP":
+                            supported = True
+
+                    enemy_pawn_can_chase = False
+                    for dc in (-1, 1):
+                        er = r + 1
+                        ec = c + dc
+                        if 0 <= er < 8 and 0 <= ec < 8 and board[er][ec] == "wP":
+                            enemy_pawn_can_chase = True
+
+                    if supported and not enemy_pawn_can_chase:
+                        score -= 0.25
+
+    return score
+
+
+def king_pawn_shield_score(gs, phase):
+    """
+    Reward kings that still have a pawn shield in front of them.
+    Most relevant in opening and middlegame.
+    """
+    if phase == "endgame":
+        return 0.0
+
+    score = 0.0
+
+    # White king shield
+    wr, wc = gs.white_king_location
+    white_shield = 0
+    for dc in (-1, 0, 1):
+        rr = wr - 1
+        cc = wc + dc
+        if 0 <= rr < 8 and 0 <= cc < 8:
+            if gs.board[rr][cc] == "wP":
+                white_shield += 1
+    score += 0.12 * white_shield
+
+    # Black king shield
+    br, bc = gs.black_king_location
+    black_shield = 0
+    for dc in (-1, 0, 1):
+        rr = br + 1
+        cc = bc + dc
+        if 0 <= rr < 8 and 0 <= cc < 8:
+            if gs.board[rr][cc] == "bP":
+                black_shield += 1
+    score -= 0.12 * black_shield
+
+    return score
+
+
 def mobility_score(gs):
-    """
-    Reward having more legal moves than the opponent.
-    """
     current_turn = gs.white_to_move
 
     gs.white_to_move = True
@@ -343,10 +468,6 @@ def mobility_score(gs):
 
 
 def king_activity_score(gs, phase):
-    """
-    In the endgame, active kings matter much more.
-    Reward the stronger side's king moving closer to the enemy king.
-    """
     if phase != "endgame":
         return 0.0
 
@@ -364,10 +485,6 @@ def king_activity_score(gs, phase):
 
 
 def edge_pressure_score(gs):
-    """
-    Reward pushing the weaker king toward the edge in winning endgames.
-    Useful especially in Forced-Win mode.
-    """
     def edge_bonus(row, col):
         return max(abs(3.5 - row), abs(3.5 - col))
 
@@ -385,12 +502,6 @@ def edge_pressure_score(gs):
 
 
 def evaluate_position(gs, mode="fair"):
-    """
-    Main evaluation function.
-
-    Positive score = White better
-    Negative score = Black better
-    """
     if gs.checkmate:
         return -9999 if gs.white_to_move else 9999
 
@@ -403,6 +514,10 @@ def evaluate_position(gs, mode="fair"):
     pst = piece_square_score(gs.board, phase)
     center = center_control_score(gs.board)
     pawns = pawn_structure_score(gs.board)
+    bishops = bishop_pair_bonus(gs.board)
+    rooks = rook_file_bonus(gs.board) + rook_seventh_rank_bonus(gs.board)
+    knights = knight_outpost_bonus(gs.board)
+    king_shield = king_pawn_shield_score(gs, phase)
     mobility = mobility_score(gs)
     king_activity = king_activity_score(gs, phase)
     edge_pressure = edge_pressure_score(gs)
@@ -413,6 +528,10 @@ def evaluate_position(gs, mode="fair"):
             + 0.6 * pst
             + 0.4 * center
             + 0.5 * pawns
+            + 0.2 * bishops
+            + 0.2 * rooks
+            + 0.2 * knights
+            + 0.2 * king_shield
         )
 
     if mode == "hard":
@@ -421,16 +540,23 @@ def evaluate_position(gs, mode="fair"):
             + 0.7 * pst
             + 0.5 * center
             + 0.7 * pawns
+            + 0.4 * bishops
+            + 0.4 * rooks
+            + 0.4 * knights
+            + 0.5 * king_shield
             + 0.8 * mobility
             + 0.6 * king_activity
         )
 
-    # forced-win mode
     return (
         1.0 * mat
         + 0.7 * pst
         + 0.4 * center
         + 0.8 * pawns
+        + 0.4 * bishops
+        + 0.4 * rooks
+        + 0.4 * knights
+        + 0.4 * king_shield
         + 0.9 * mobility
         + 0.9 * king_activity
         + 1.2 * edge_pressure
@@ -438,9 +564,6 @@ def evaluate_position(gs, mode="fair"):
 
 
 def explain_move(gs_before, move, gs_after, mode="fair"):
-    """
-    Generate a readable explanation for the AI's chosen move.
-    """
     reasons = []
     phase = get_game_phase(gs_before.board)
 
