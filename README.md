@@ -2,17 +2,17 @@
 
 <img src="https://img.shields.io/badge/Project-Chess%20AI-blue?style=for-the-badge" />
 <img src="https://img.shields.io/badge/AI-Minimax%20%2B%20Alpha--Beta-purple?style=for-the-badge" />
-<img src="https://img.shields.io/badge/Modes-Fair%20%7C%20Hard%20%7C%20Forced--Win-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Search-Quiescence%20%2B%20PV-orange?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Explainable-AI-green?style=for-the-badge" />
 <img src="https://img.shields.io/badge/Language-Python-yellow?style=for-the-badge" />
-<img src="https://img.shields.io/badge/Level-CS50%20AI%20Project-green?style=for-the-badge" />
-</p>
 
-<br>
+</p>
 
 <p align="center">
 
 <img src="https://img.shields.io/github/last-commit/Nomusa990822/Chess-AI?style=for-the-badge" />
 <img src="https://img.shields.io/github/languages/top/Nomusa990822/Chess-AI?style=for-the-badge" />
+<img src="https://img.shields.io/github/repo-size/Nomusa990822/Chess-AI?style=for-the-badge" />
 
 </p>
 
@@ -21,76 +21,117 @@
 <h1 align="center">♟️ Chess AI with Forced Advantage</h1>
 
 <p align="center">
-A strategic adversarial AI system built using Minimax search and Alpha-Beta pruning, designed to simulate intelligent decision-making in complex environments.
+A deep, explainable chess engine built with adversarial search, advanced evaluation, and transparent AI reasoning.
+</p>
+
+<p align="center">
+Built for <strong>CS50’s Introduction to AI with Python</strong>
 </p>
 
 ---
 
 ## Overview
 
-This project implements a **full chess engine and AI opponent** built in Python for **CS50’s Introduction to AI with Python**.
+This project is a **terminal-based Chess AI engine** designed to demonstrate how classical AI techniques can produce strong, explainable decision-making.
 
-The system introduces **three distinct gameplay modes**:
+Unlike basic chess implementations, this engine combines:
 
-- **Fair Mode** — balanced AI gameplay  
-- **Hard Mode** — stronger AI with deeper reasoning  
-- **Forced-Win Mode** — AI starts from a theoretically winning position  
+- Minimax + Alpha-Beta pruning  
+- Quiescence search  
+- Principal variation tracking  
+- Advanced evaluation heuristics  
+- Explainable AI output  
+- Full test coverage  
 
-Unlike traditional claims of “solving chess”, this project focuses on:
-
-> **Adversarial search, heuristic evaluation, and strategic decision-making in complex environments.**
+It is not just a game — it is a **transparent decision-making system**.
 
 ---
 
-## Key Highlights
+## Key Features
 
-- Full chess engine with legal move validation  
-- AI powered by Minimax + Alpha-Beta pruning  
-- Forced-Win mode using winning endgame positions  
-- Advanced heuristic evaluation system  
-- Turn-based adversarial reasoning  
-- AI move explanations for transparency  
+### Chess Engine
+- Legal move generation
+- Check / checkmate / stalemate detection
+- Castling, en passant, promotion
+- Undo move functionality
+- Draw by repetition
+
+### AI Engine
+- Minimax search
+- Alpha-Beta pruning
+- Iterative deepening
+- Quiescence search
+- Move ordering
+- Principal variation tracking
+- Search diagnostics (nodes, depth, pruning)
+
+### Evaluation System
+- Material balance
+- Piece-square tables
+- Center control
+- Pawn structure (doubled, isolated, passed, chains)
+- Bishop pair bonus
+- Rook file + 7th rank bonuses
+- Knight outposts
+- King safety (pawn shield)
+- Mobility
+- Game phase awareness
+- Endgame king activity
+- Edge pressure
+
+### Explainable AI
+- Why the move was chosen
+- Evaluation breakdown
+- Before/after evaluation delta
+- Top candidate moves
+- Principal variation
 
 ---
 
 ## Game Modes
 
 | Mode | Description |
-|------|------------|
-| **Fair Mode** | Balanced AI with limited search depth |
-| **Hard Mode** | Strong AI with deeper search and positional evaluation |
-| **Forced-Win Mode** | AI starts from a winning position and converts advantage |
+|------|-------------|
+| **Fair** | Balanced gameplay |
+| **Hard** | Stronger positional AI |
+| **Forced-Win** | AI starts with advantage and converts |
 
 ---
 
-##  System Architecture
+## System Architecture
 
 ```mermaid
 flowchart TD
+    A[User Input] --> B[main.py]
 
-A[User Input] --> B[main.py]
+    B --> C[GameState Engine]
+    B --> D[AI Engine]
 
-B --> C[GameState Engine]
-C --> D[Move Generator]
-C --> E[Game Rules]
+    %% Engine Layer
+    C --> C1[Move Generator]
+    C --> C2[Game Rules]
+    C --> C3[Board Update]
 
-B --> F[AI Engine]
+    C3 --> C4[Display Output]
 
-F --> G[Minimax Algorithm]
-G --> H[Alpha-Beta Pruning]
-H --> I[Evaluation Function]
+    %% AI Layer
+    D --> D1[Best Move Selection]
+    D --> D2[Search Controller]
 
-I --> J[Material Score]
-I --> K[Position Score]
-I --> L[Mobility & King Safety]
+    D2 --> D3[Minimax Algorithm]
+    D3 --> D4[Alpha-Beta Pruning]
+    D4 --> D5[Transposition Table]
+    D5 --> D6[Quiescence Search]
+    D6 --> D7[Evaluation Function]
 
-F --> M[Best Move Selection]
+    %% Evaluation Layer
+    D7 --> E1[Material Score]
+    D7 --> E2[Positional Score]
+    D7 --> E3[Mobility & King Safety]
+    D7 --> E4[Pawn Structure]
 
-M --> C
-
-C --> N[Board Update]
-
-N --> O[Display Output]
+    %% Feedback Loop
+    D1 --> C
 ```
 
 ---
@@ -99,124 +140,119 @@ N --> O[Display Output]
 
 ```mermaid
 flowchart TD
+    A[Current Board State] --> B[Generate Legal Moves]
+    B --> C[Order Moves]
 
-A[Current Board State] --> B[Generate Legal Moves]
+    C --> D[Iterative Deepening]
+    D --> E[Minimax Search]
 
-B --> C[Simulate Moves]
+    E --> F[Alpha-Beta Pruning]
+    F --> G[Transposition Table Lookup]
 
-C --> D[Minimax Search]
+    G --> H[Quiescence Search]
+    H --> I[Evaluate Positions]
 
-D --> E[Alpha-Beta Pruning]
-
-E --> F[Evaluate Positions]
-
-F --> G[Select Best Move]
-
-G --> H[Return Move]
+    I --> J[Track Principal Variation]
+    J --> K[Select Best Move]
+    K --> L[Return Move]
 ```
+
 ---
 
-## Project Structure 
+## Evaluation Breakdown
 
+The engine evaluates positions using multiple components:
+* **Material** → piece values
+* **Piece-Square Tables** → positional placement
+* **Center Control** → board dominance
+* **Pawn Structure** → long-term stability
+* **Mobility** → number of legal moves
+* **King Safety** → pawn shield
+* **Endgame Activity** → king positioning
+* **Edge Pressure** → forcing king to edge
+
+---
+
+## Explainability Example
+
+
+---
+
+## Project Structure
 ```
-chess_ai/
+Chess-AI/
 │
-├── main.py               # Game loop and UI
-├── engine.py             # Core chess logic
-├── ai.py                 # Minimax + Alpha-Beta
-├── evaluation.py         # Heuristic evaluation
-├── forced_positions.py   # Winning setups
-├── utils.py              # Helpers & display
+├── main.py
+├── engine.py
+├── ai.py
+├── evaluation.py
+├── forced_positions.py
+├── utils.py
+│
+├── tests/
+│   ├── test_engine.py
+│   ├── test_evaluation.py
+│   └── test_forced_positions.py
+│
+├── assets/
+│   └── game.jpg
+│
+├── requirements.txt
+├── .gitignore
 └── README.md
 ```
 
 ---
-
-## AI Techniques Used
-
-**1. Minimax Algorithm**
-- Simulates future game states assuming optimal play from both sides
-
-**2. Alpha-Beta Pruning**
-- Optimizes search by eliminating unnecessary branches
-
-**3. Heuristic Evaluation**
-
-Positions are evaluated using:
-
-- Material balance
-- Piece-square tables
-- Center control
-- Pawn structure
-- Mobility
-- King positioning
-
----
-
 ## How to Run
-
 ```
+git clone https://github.com/Nomusa990822/Chess-AI.git
+cd Chess-AI
+pip install -r requirements.txt
 python main.py
 ```
+### Run Tests
+
+```pytest```
 
 ---
 
-## Move Input Format 
+## Preview 
 
-|**Example**|**Meaning**|
-|-----------|-----------|
-|```e2e4```|Move piece from e2 → e4|
-|```g1f3```|Knight move|
-|```e7e8q```|Pawn promotion|
-
-#### Casting 
-
-- ```e1g1``` → White kingside
-- ```e1c1``` → White queenside
-- ```e8g8``` → Black kingside
-- ```e8c8``` → Black queenside
 
 ---
 
-## Game Preview 
-<p align="center">
-  <img src="assets/game.jpg" width="700"/>
-</p>
+## What This Project Demonstrates
+* Adversarial search (Minimax)
+* Search optimization (Alpha-Beta)
+* Tactical extensions (Quiescence)
+* Heuristic evaluation design
+* Explainable AI systems
+* Clean modular architecture
+* Software testing practices
 
 ---
 
-## Educational Value
-
-This project demonstrates:
-- Adversarial search in complex environments
-- Decision-making under uncertainty
-- Trade-offs between depth and computation
-- Strategic reasoning in game theory
-
----
-
-## ⚠️ Important Note
-This project does NOT claim to solve chess.
-
-Instead, it demonstrates:
-> How an AI can dominate through superior search and evaluation, and guarantee wins in pre-defined winning scenarios.
-
+## Important Notes
+* Scores are from White’s perspective
+  - Positive → White advantage
+  - Negative → Black advantage
+* Search evaluation ≠ static evaluation
+  - Search includes lookahead
+  - Static evaluates current position only
 ---
 
 ## Future Improvements
-- Graphical UI (Pygame / Web)
-- Opening book integration
-- Iterative deepening
-- Transposition tables
-- AI vs AI mode
-- Move timers
-- Save/load games
+* Opening book
+* Killer move heuristic
+* Zobrist hashing
+* GUI version (Pygame/Web)
+* AI vs AI mode
+* PGN export
 
 ---
 ## Author
 Nomusa Shongwe
 
 ---
-
-## Final Thought
-> This project is not just a chess engine; it is a demonstration of how AI thinks, evaluates, and wins.
+## Final Note
+> This project shows that powerful AI does not require machine learning — it can emerge from structured reasoning, search, and well-designed evaluation.
