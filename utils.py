@@ -1,16 +1,16 @@
 """
-utils.py
-
-Helper utilities for display, move parsing, and small UI features.
+Terminal helpers:
+- colors
+- banner
+- separators
+- board printing
+- input parsing
 """
 
 from engine import Move
 
 
 def color_text(text, color):
-    """
-    Minimal ANSI coloring for terminal output.
-    """
     colors = {
         "red": "\033[91m",
         "green": "\033[92m",
@@ -22,82 +22,78 @@ def color_text(text, color):
     return f"{colors.get(color, '')}{text}{colors['reset']}"
 
 
+def print_separator():
+    print("\n" + "=" * 78)
+
+
 def print_welcome_banner():
     banner = r"""
-===============================
-        CHESS AI
-===============================
+==============================================================
+                        CHESS AI
+==============================================================
 
-CS50 AI Project
-Chess AI with Forced Advantage
-    """
+        CS50 AI Project - Chess AI with Forced Advantage
+"""
     print(color_text(banner, "cyan"))
 
 
 def print_mode_info(mode):
     if mode == "fair":
-        print(color_text("\nFair Mode:", "green"))
-        print("Balanced AI. Lower search depth, simpler evaluation.")
+        print(color_text("\nFair Mode", "green"))
+        print("Balanced search depth and lighter evaluation.")
     elif mode == "hard":
-        print(color_text("\nHard Mode:", "yellow"))
-        print("Stronger AI. Deeper search, better positional evaluation.")
+        print(color_text("\nHard Mode", "yellow"))
+        print("Deeper search, better move ordering, stronger evaluation.")
     else:
-        print(color_text("\nForced-Win Mode:", "red"))
-        print("The AI starts from a theoretically winning position.")
+        print(color_text("\nForced-Win Mode", "red"))
+        print("Starts from a winning position and emphasizes endgame conversion.")
 
 
 def print_help():
-    print("\nInstructions:")
+    print("\nInstructions")
     print("1. Enter moves in coordinate notation, e.g. e2e4")
     print("2. Promotion example: e7e8q")
-    print("3. Castling is entered by moving the king:")
-    print("   - e1g1 for White kingside")
-    print("   - e1c1 for White queenside")
-    print("   - e8g8 for Black kingside")
-    print("   - e8c8 for Black queenside")
-    print("4. Type 'moves' to list all legal moves")
-    print("5. Type 'quit' to exit")
+    print("3. Castling is entered as king movement:")
+    print("   e1g1, e1c1, e8g8, e8c8")
+    print("4. Commands:")
+    print("   help  -> show instructions")
+    print("   moves -> list legal moves")
+    print("   undo  -> undo the last full turn")
+    print("   quit  -> exit game")
 
 
 def print_board(board):
-    """
-    Pretty-print the board to the terminal.
-    """
-    print("\n    a    b    c    d    e    f    g    h")
-    print("  " + "-" * 41)
+    print("\n     a    b    c    d    e    f    g    h")
+    print("   " + "-" * 41)
+
     for r in range(8):
-        print(f"{8-r} |", end="")
+        print(f" {8-r} |", end="")
         for c in range(8):
             piece = board[r][c]
             display = piece if piece != "--" else "  "
 
             if piece.startswith("w"):
-                cell = color_text(f"{display}", "green")
+                display = color_text(display, "green")
             elif piece.startswith("b"):
-                cell = color_text(f"{display}", "cyan")
-            else:
-                cell = display
+                display = color_text(display, "cyan")
 
-            print(f" {cell} |", end="")
+            print(f" {display} |", end="")
         print(f" {8-r}")
-        print("  " + "-" * 41)
-    print("    a    b    c    d    e    f    g    h")
+        print("   " + "-" * 41)
+
+    print("     a    b    c    d    e    f    g    h")
 
 
 def parse_user_move(user_input, board):
     """
-    Parse input like:
-    - e2e4
-    - e7e8q
-    Return Move object or None if invalid format.
+    Parse user input like:
+    e2e4
+    e7e8q
     """
     if len(user_input) not in (4, 5):
         return None
 
-    start_file = user_input[0]
-    start_rank = user_input[1]
-    end_file = user_input[2]
-    end_rank = user_input[3]
+    start_file, start_rank, end_file, end_rank = user_input[:4]
 
     if (
         start_file not in Move.files_to_cols
