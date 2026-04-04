@@ -1,197 +1,199 @@
-# Search Notes
+# Search & Decision-Making Notes
 
 ## Overview
 
-The AI in this project is based on classical adversarial search.
-
-Its main goal is to answer the question:
-
-> Given the current board state, what move leads to the best achievable outcome under optimal play?
-
-To answer that, the search system combines several techniques.
-
----
-
-## 1. Minimax
-
-Minimax is the core decision-making algorithm.
+The Chess AI uses **adversarial search** to determine the best move.
 
 It assumes:
-- the AI chooses moves that maximize its outcome
-- the opponent chooses moves that minimize that outcome
+> Both players play optimally.
 
-This makes it suitable for two-player zero-sum games like chess.
-
-At each level of the search tree:
-- one side tries to maximize the score
-- the other side tries to minimize it
+The search process explores future positions and evaluates them to choose the most favorable outcome.
 
 ---
 
-## 2. Alpha-Beta Pruning
+## Core Search Flow
 
-Minimax alone is expensive because the number of possible positions grows very quickly.
-
-Alpha-Beta pruning improves efficiency by skipping branches that cannot affect the final result.
-
-Two bounds are used:
-- **alpha** = best score the maximizing player can guarantee so far
-- **beta** = best score the minimizing player can guarantee so far
-
-If a branch cannot improve the outcome, it is pruned.
-
-This reduces the number of nodes explored while keeping the same final decision.
-
----
-
-## 3. Iterative Deepening
-
-Instead of searching directly to one fixed depth, the engine searches progressively:
-
-- depth 1
-- depth 2
-- depth 3
-- and so on
-
-This provides:
-- better move ordering
-- a usable best move even if time runs out
-- more stable search behavior
-
-It also mirrors how stronger engines often manage time.
+```mermaid
+flowchart TD
+    A[Current Position] --> B[Generate Moves]
+    B --> C[Order Moves]
+    C --> D[Iterative Deepening]
+    D --> E[Minimax Search]
+    E --> F[Alpha-Beta Pruning]
+    F --> G[Transposition Table]
+    G --> H[Quiescence Search]
+    H --> I[Evaluation]
+    I --> J[Best Move Selection]
+```
 
 ---
 
-## 4. Move Ordering
+## Minimax Algorithm
 
-The order of moves matters a lot for Alpha-Beta pruning.
+Minimax models chess as a two-player zero-sum game.
+* Max player (White) → maximize score
+* Min player (Black) → minimize score
 
-Good move ordering leads to earlier cutoffs and faster search.
+**Recurrence:**
 
-This project prioritizes moves such as:
-- captures
-- promotions
-- castling
-- forcing tactical moves
-- transposition-table best moves
-
-Better move ordering improves efficiency without changing the underlying logic.
+> max(node) = max(child values)
+> min(node) = min(child values)
 
 ---
 
-## 5. Transposition Table
+## Alpha-Beta Pruning
+Reduces the number of nodes explored.
 
-The same position can often be reached through different move orders.
+**Key Idea:**
+Skip branches that cannot influence the final decision.
+* Alpha = best value for maximizer
+* Beta = best value for minimizer
 
-A transposition table stores previously evaluated positions so they do not need to be searched again.
-
-Each stored entry may include:
-- depth searched
-- score
-- bound type
-- best move
-
-This improves performance and helps move ordering.
-
----
-
-## 6. Quiescence Search
-
-A normal depth-limited search can stop in unstable tactical positions.
-
-For example, it may evaluate a position:
-- right before a capture
-- right before a recapture
-- right before a tactical exchange
-
-This leads to the **horizon effect**.
-
-Quiescence search extends the search beyond the normal depth limit, but only through tactical continuations such as:
-- captures
-- promotions
-- optionally checks
-
-The goal is to evaluate quieter, more stable positions.
+If:
+```
+alpha ≥ beta → prune branch
+```
 
 ---
 
-## 7. Principal Variation
+## Iterative Deepening
 
-The principal variation is the best line of play currently predicted by the AI.
+Instead of searching to full depth immediately:
+* search depth 1
+* then depth 2
+* then depth 3...
 
-Instead of returning only one move, the AI can also display a line such as:
-
-- `Qg2+`
-- `Kxg2`
-- `Kf2`
-
-This shows the sequence of moves the engine currently believes to be optimal.
-
-Principal variation output makes the AI feel much more transparent and professional.
+**Benefits:**
+* always has a usable move
+* improves move ordering
+* supports time control
 
 ---
 
-## 8. Evaluation Function
+## Move Ordering
 
-When the search does not reach checkmate or another terminal result, the position must be estimated heuristically.
+Strong moves are searched first to improve pruning.
 
-This project evaluates positions using:
-- material balance
-- piece-square tables
-- center control
-- pawn structure
-- mobility
-- game phase awareness
-- king activity in the endgame
-- edge pressure in forced-win conversions
-
-This allows the AI to choose strong moves even when the full outcome is not yet known.
+Typical ordering:
+* captures
+* checks
+* promotions
+* killer moves (future upgrade)
 
 ---
 
-## 9. Game Phase Awareness
+## Quiescence Search
 
-The evaluation does not treat all positions the same.
+**Problem: Horizon Effect**
+The engine might stop searching in unstable positions.
 
-The engine distinguishes between:
-- opening
-- middlegame
-- endgame
+**Solution:**
+Extend search for:
+* captures
+* tactical sequences
 
-This matters because the importance of features changes across phases.
-
-For example:
-- king safety matters more in the opening and middlegame
-- king activity matters more in the endgame
-
-This makes evaluation more context-sensitive.
+Until position becomes quiet.
 
 ---
 
-## 10. Forced-Win Mode Search Behavior
+## Transposition Table
 
-In Forced-Win mode, the engine starts from a winning position.
+Caches previously evaluated positions.
 
-The evaluation is adjusted to encourage:
-- restricting the defending king
-- pushing the king toward the edge
-- improving king coordination
-- converting material advantage into mate
-
-This makes the AI behave more like an endgame conversion engine.
+**Benefits:**
+* avoids recomputation
+* speeds up search
+* improves pruning
 
 ---
 
-## Why this search design is strong
+## Principal Variation (PV)
 
-This project does not attempt to solve chess.
+The PV is the engine’s best predicted line of play.
 
-Instead, it demonstrates a serious classical AI pipeline that includes:
-- adversarial search
-- pruning
-- caching
-- tactical extension
-- strategic evaluation
-- search transparency
+**Example:**
+```
+d7d5 → e2e3 → e7e5
+```
 
-Together, these components make the system much deeper than a basic minimax implementation.
+---
+
+## Evaluation Function
+
+At leaf nodes, positions are scored using:
+* material
+* positional factors
+* pawn structure
+* mobility
+* king safety
+* game phase
+
+---
+
+## Decision Pipeline
+
+1. Generate legal moves
+2. Simulate each move
+3. Explore future positions
+4. Evaluate resulting positions
+5. Compare scores
+6. Choose best move
+
+---
+
+## Limitations
+
+**1. Exponential Growth**
+
+Search complexity grows rapidly:
+```
+O(b^d)
+```
+Where:
+* b = branching factor (~35 in chess)
+* d = depth
+
+**2. Horizon Effect**
+
+Even with quiescence, long-term tactics may be missed.
+
+**3. No Learning**
+
+The engine does not adapt or learn from games.
+
+---
+
+## Future Improvements
+* killer move heuristic
+* history heuristic
+* aspiration windows
+* Zobrist hashing
+* opening book
+* endgame tablebases
+
+---
+
+## Key Insight
+
+This system demonstrates that:
+> Strong decision-making can emerge from structured search + evaluation.
+
+Without neural networks, the engine can still:
+* plan ahead
+* evaluate positions
+* explain decisions
+
+---
+
+## Conclusion
+
+The search system is the core intelligence of the engine.
+
+**It transforms:**
+* a static board into
+* a strategic decision
+
+**by combining:**
+* exploration (search)
+* evaluation (heuristics)
+* optimization (pruning)
