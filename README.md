@@ -17,7 +17,20 @@
 
 <br/>
 
+[**Overview**](#01--overview) · [**Capabilities**](#02--core-capabilities) · [**Architecture**](#04--system-architecture) · [**Search**](#05--search--decision-making) · [**Evaluation**](#06--evaluation-methodology) · [**Explainability**](#07--explainability) · [**Run It**](#10--installation--execution)
+
 </div>
+
+---
+
+## Contents
+
+| | | | |
+|---|---|---|---|
+| [01 Overview](#01--overview) | [05 Search & Decision-Making](#05--search--decision-making) | [09 Project Structure](#09--project-structure) | [13 Limitations & Future Development](#13--current-limitations--future-development) |
+| [02 Core Capabilities](#02--core-capabilities) | [06 Evaluation Methodology](#06--evaluation-methodology) | [10 Installation & Execution](#10--installation--execution) | [14 Documentation](#14--documentation) |
+| [03 Game Modes](#03--game-modes) | [07 Explainability](#07--explainability) | [11 Testing](#11--testing) | [15 Author](#15--author) |
+| [04 System Architecture](#04--system-architecture) | [08 Application Preview](#08--application-preview) | [12 Design Principles](#12--design-principles) | |
 
 ---
 
@@ -29,11 +42,31 @@ Rather than relying on a trained neural network, the system uses adversarial sea
 
 The project brings together three interconnected components:
 
-- **Chess Engine** — a deterministic implementation of chess rules and game-state management.
-- **Search Engine** — an adversarial decision-making system built around Minimax and Alpha-Beta pruning.
-- **Evaluation & Explainability** — a heuristic framework that scores positions and exposes information about the AI's decisions.
+- **Chess Engine**: a deterministic implementation of chess rules and game-state management.
+- **Search Engine**: an adversarial decision-making system built around Minimax and Alpha-Beta pruning.
+- **Evaluation & Explainability**: a heuristic framework that scores positions and exposes information about the AI's decisions.
 
 The objective is not simply to produce a playable chess opponent. It is to demonstrate how an AI system can reason about a structured problem, optimise its search and communicate meaningful information about its decisions.
+
+### At a Glance
+
+| | |
+|---|---|
+| **Language** | Python 3, standard library only |
+| **Search** | Minimax with Alpha-Beta pruning, iterative deepening, transposition table, quiescence search |
+| **Evaluation** | Handcrafted heuristics: material, piece-square tables, pawn structure, king safety, mobility, game phase |
+| **Explainability** | Search diagnostics, evaluation breakdowns, top candidate moves and principal variation |
+| **Modes** | Fair · Hard · Forced-Win |
+| **Interface** | Terminal |
+| **Testing** | Automated `pytest` suite covering the engine, evaluation and preset positions |
+
+### Quick Start
+
+```bash
+git clone https://github.com/Nomusa990822/Chess-AI.git
+cd Chess-AI
+python main.py
+```
 
 ---
 
@@ -100,7 +133,8 @@ The system exposes information about its search and evaluation process.
 - Alpha-Beta pruning count
 - Transposition-table hits
 
-These outputs provide an interpretable view of the engine's decision process. They are heuristic explanations and search diagnostics, not a complete causal proof of why a move is optimal.
+> [!NOTE]
+> These outputs are heuristic explanations and search diagnostics. They provide an interpretable view of the engine's decision process, not a complete causal proof of why a move is optimal.
 
 ---
 
@@ -125,37 +159,85 @@ The actual depth reached can be lower than the configured limit because the sear
 The project follows a modular architecture that separates game rules, search, evaluation and presentation.
 
 ```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryTextColor": "#171A21",
+    "lineColor": "#5b6270"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 34, "rankSpacing": 46, "htmlLabels": true }
+}}%%
 flowchart TD
-    A["Human Player"] --> B["main.py<br/>Game Controller"]
+    A(["<b>Human Player</b>"]) --> B["<b>main.py</b><br/>Game Controller"]
 
-    B --> C["engine.py<br/>Chess Engine"]
-    B --> D["ai.py<br/>Search Engine"]
+    subgraph RULES["&nbsp;CHESS ENGINE&nbsp;"]
+        direction TB
+        C["<b>engine.py</b><br/>Chess Engine"]
+        E["Legal Move Generation"]
+        F["Game Rules &amp; State"]
+        G["Move Execution / Undo"]
+        C --> E
+        C --> F
+        C --> G
+    end
 
-    C --> E["Legal Move Generation"]
-    C --> F["Game Rules & State"]
-    C --> G["Move Execution / Undo"]
+    subgraph SEARCH["&nbsp;SEARCH ENGINE&nbsp;"]
+        direction TB
+        D["<b>ai.py</b><br/>Search Engine"]
+        H["Iterative Deepening"]
+        I["Minimax Search"]
+        J["Alpha-Beta Pruning"]
+        K[("Transposition Table")]
+        L["Quiescence Search"]
+        D --> H --> I --> J
+        J <--> K
+        I --> L
+    end
 
-    D --> H["Iterative Deepening"]
-    H --> I["Minimax Search"]
-    I --> J["Alpha-Beta Pruning"]
+    subgraph EVAL["&nbsp;EVALUATION&nbsp;"]
+        direction TB
+        M["<b>evaluation.py</b><br/>Position Evaluation"]
+        N["Material &amp; Positional Factors"]
+        O["Pawn Structure &amp; Mobility"]
+        P["King Safety &amp; Game Phase"]
+        M --> N
+        M --> O
+        M --> P
+    end
 
-    J <--> K["Transposition Table"]
-    I --> L["Quiescence Search"]
+    subgraph XAI["&nbsp;EXPLAINABILITY OUTPUT&nbsp;"]
+        direction TB
+        Q["Search Diagnostics"]
+        R["Principal Variation"]
+        S["Move Explanation"]
+    end
 
-    I --> M["evaluation.py<br/>Position Evaluation"]
-
-    M --> N["Material & Positional Factors"]
-    M --> O["Pawn Structure & Mobility"]
-    M --> P["King Safety & Game Phase"]
-
-    D --> Q["Search Diagnostics"]
-    D --> R["Principal Variation"]
-    D --> S["Move Explanation"]
-
+    B --> C
+    B --> D
+    I --> M
+    D --> Q
+    D --> R
+    D --> S
     Q --> B
     R --> B
     S --> B
     G --> B
+
+    classDef ctrl  fill:#171A21,stroke:#171A21,color:#F4F0E6;
+    classDef core  fill:#F7EFD9,stroke:#C6A15B,stroke-width:1.5px,color:#171A21;
+    classDef leaf  fill:#F4F0E6,stroke:#AAB3C0,color:#171A21;
+    classDef store fill:#EFE3E6,stroke:#8C5260,stroke-width:1.5px,color:#171A21;
+    class A,B ctrl;
+    class C,D,M core;
+    class E,F,G,H,I,J,L,N,O,P,Q,R,S leaf;
+    class K store;
+
+    style RULES  fill:#FBF8F0,stroke:#C6A15B,stroke-width:1.5px
+    style SEARCH fill:#FBF8F0,stroke:#C6A15B,stroke-width:1.5px
+    style EVAL   fill:#FBF8F0,stroke:#C6A15B,stroke-width:1.5px
+    style XAI    fill:#F6F7F9,stroke:#AAB3C0,stroke-width:1.5px,stroke-dasharray: 6 4
+    linkStyle default stroke:#5b6270,stroke-width:1.5px
 ```
 
 ### Architectural Responsibilities
@@ -179,46 +261,62 @@ The search engine uses a depth-limited Minimax algorithm to evaluate possible se
 
 Chess is treated as a two-player, zero-sum game:
 
-- White attempts to maximise the evaluation.
-- Black attempts to minimise the evaluation.
-- Scores are consistently calculated from White's perspective.
+- White attempts to **maximise** the evaluation.
+- Black attempts to **minimise** the evaluation.
+- Scores are consistently calculated from **White's perspective**.
 
 ### Search Pipeline
 
 ```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryTextColor": "#171A21",
+    "lineColor": "#5b6270"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 30, "rankSpacing": 40, "htmlLabels": true }
+}}%%
 flowchart TD
-    A["Current Position"] --> B["Generate Legal Moves"]
-    B --> C["Order Candidate Moves"]
-    C --> D["Iterative Deepening"]
+    A(["<b>Current Position</b>"]) --> B["<b>Generate Legal Moves</b>"]
+    B --> C["<b>Order Candidate Moves</b>"]
+    C --> D["<b>Iterative Deepening</b><br/>Depth 1, 2, 3 …"]
 
-    D --> E["Minimax Search"]
-    E --> F{"Search depth reached?"}
+    D --> E["<b>Minimax Search</b><br/>with Alpha-Beta pruning"]
+    E <-->|"probe / store"| TT[("<b>Transposition<br/>Table</b>")]
+    E --> F{"<b>Search depth<br/>reached?</b>"}
 
-    F -->|No| G["Explore Child Positions"]
-    G --> H["Alpha-Beta Pruning"]
-    H --> I["Transposition Table"]
+    F -->|"No"| G["<b>Explore Child Positions</b>"]
+    G --> E
 
-    I --> E
+    F -->|"Yes"| J["<b>Quiescence Search</b><br/>captures and promotions"]
+    J --> K["<b>Evaluate Position</b>"]
+    K --> L["<b>Update Search Results</b><br/>and Principal Variation"]
 
-    F -->|Yes| J["Quiescence Search"]
-    J --> K["Evaluate Position"]
+    L --> Z{"<b>Depth limit or<br/>time budget reached?</b>"}
+    Z -->|"No"| D
+    Z -->|"Yes"| N(["<b>Select Best Move</b><br/>from last completed iteration"])
 
-    K --> L["Update Search Results"]
-    L --> M["Principal Variation"]
-    M --> N["Select Best Move"]
+    classDef start fill:#171A21,stroke:#171A21,color:#F4F0E6;
+    classDef step  fill:#F7EFD9,stroke:#C6A15B,stroke-width:1.5px,color:#171A21;
+    classDef gate  fill:#EFE3E6,stroke:#8C5260,stroke-width:1.5px,color:#171A21;
+    classDef store fill:#F4F0E6,stroke:#AAB3C0,stroke-width:1.5px,color:#171A21;
+    classDef final fill:#C6A15B,stroke:#C6A15B,color:#171A21;
+    class A start;
+    class B,C,D,E,G,J,K,L step;
+    class F,Z gate;
+    class TT store;
+    class N final;
+    linkStyle default stroke:#5b6270,stroke-width:1.5px
 ```
 
 ### Minimax
 
-Minimax evaluates possible moves under the assumption that both players make rational decisions.
-
-At each level, the engine alternates between maximising and minimising the evaluation score.
+Minimax evaluates possible moves under the assumption that both players make rational decisions. At each level, the engine alternates between maximising and minimising the evaluation score.
 
 ### Alpha-Beta Pruning
 
-Alpha-Beta pruning improves search efficiency by eliminating branches that cannot affect the final result.
-
-It maintains two bounds:
+Alpha-Beta pruning improves search efficiency by eliminating branches that cannot affect the final result. It maintains two bounds:
 
 - **Alpha:** the best value currently available to the maximising player.
 - **Beta:** the best value currently available to the minimising player.
@@ -238,27 +336,51 @@ This allows the engine to retain a usable result from the last completed search 
 
 ### Transposition Table
 
-Different move sequences can lead to the same board position.
-
-The transposition table stores previously searched position information so that useful results can be reused instead of repeatedly calculating equivalent positions.
+Different move sequences can lead to the same board position. The transposition table stores previously searched position information so that useful results can be reused instead of repeatedly calculating equivalent positions.
 
 ### Quiescence Search
 
-A fixed search depth can terminate in the middle of a tactical sequence, creating the horizon effect.
-
-Quiescence search extends the evaluation of unstable positions through captures and pawn promotions until a quieter position is reached.
+A fixed search depth can terminate in the middle of a tactical sequence, creating the horizon effect. Quiescence search extends the evaluation of unstable positions through captures and pawn promotions until a quieter position is reached.
 
 ### Principal Variation
 
-The principal variation (PV) represents the engine's best predicted continuation from the current position.
-
-It provides a readable line of moves associated with the search result.
+The principal variation (PV) represents the engine's best predicted continuation from the current position. It provides a readable line of moves associated with the search result.
 
 ---
 
 ## 06 / Evaluation Methodology
 
 The evaluation system translates a board position into a numerical score.
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryTextColor": "#171A21",
+    "lineColor": "#5b6270"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 28, "rankSpacing": 44, "htmlLabels": true }
+}}%%
+flowchart LR
+    P(["<b>Board<br/>Position</b>"]) --> M["<b>Material</b><br/>piece values"]
+    P --> S["<b>Positional factors</b><br/>piece-square tables · centre · pawn structure<br/>bishop pair · rooks · knight outposts<br/>king safety · mobility"]
+    P --> G["<b>Game phase</b><br/>opening · middlegame · endgame"]
+    G -.->|"adjusts"| S
+    M --> T["<b>Weighted sum</b><br/>Fair / Hard / Forced weights"]
+    S --> T
+    T --> R(["<b>Score</b><br/>from White's perspective"])
+
+    classDef start fill:#171A21,stroke:#171A21,color:#F4F0E6;
+    classDef step  fill:#F7EFD9,stroke:#C6A15B,stroke-width:1.5px,color:#171A21;
+    classDef phase fill:#EFE3E6,stroke:#8C5260,stroke-width:1.5px,color:#171A21;
+    classDef final fill:#C6A15B,stroke:#C6A15B,color:#171A21;
+    class P start;
+    class M,S,T step;
+    class G phase;
+    class R final;
+    linkStyle default stroke:#5b6270,stroke-width:1.5px
+```
 
 All evaluation scores are expressed from White's perspective:
 
@@ -268,11 +390,7 @@ All evaluation scores are expressed from White's perspective:
 | Negative | Advantage for Black |
 | Near zero | Approximately balanced position |
 
-The evaluation combines material and positional considerations.
-
 ### Material
-
-Pieces receive different numerical values:
 
 | Piece | Value |
 |---|---:|
@@ -289,23 +407,23 @@ The king is not assigned a conventional material value because its importance is
 
 Beyond material, the engine considers:
 
-- **Piece-square tables:** rewards useful piece placement.
-- **Centre control:** evaluates occupation of central squares.
-- **Pawn structure:** considers doubled, isolated, passed and connected pawns.
-- **Bishop pair:** rewards possession of both bishops.
-- **Rook activity:** evaluates open files, semi-open files and seventh-rank placement.
-- **Knight outposts:** rewards supported advanced knight positions.
-- **King safety:** considers pawn-shield protection.
-- **Mobility:** compares the number of legal moves available to each side.
-- **Game phase:** adjusts positional considerations according to the opening, middlegame or endgame.
-- **King activity:** rewards appropriate king activity in endgames.
-- **Edge pressure:** considers restricting the opposing king when a material advantage exists.
+| Factor | What it evaluates |
+|---|---|
+| **Piece-square tables** | Rewards useful piece placement |
+| **Centre control** | Occupation of central squares |
+| **Pawn structure** | Doubled, isolated, passed and connected pawns |
+| **Bishop pair** | Possession of both bishops |
+| **Rook activity** | Open files, semi-open files and seventh-rank placement |
+| **Knight outposts** | Supported advanced knight positions |
+| **King safety** | Pawn-shield protection |
+| **Mobility** | Number of legal moves available to each side |
+| **Game phase** | Adjusts positional considerations for the opening, middlegame or endgame |
+| **King activity** | Appropriate king activity in endgames |
+| **Edge pressure** | Restricting the opposing king when a material advantage exists |
 
 ### Difficulty-Dependent Weights
 
-The evaluation system supports different weighting configurations for Fair, Hard and Forced modes.
-
-This allows the engine to adjust its positional priorities without changing the underlying chess rules.
+The evaluation system supports different weighting configurations for Fair, Hard and Forced modes. This allows the engine to adjust its positional priorities without changing the underlying chess rules.
 
 ---
 
@@ -342,10 +460,10 @@ Why this move was chosen:
 
 The system also provides:
 
-- Evaluation component breakdowns.
-- Evaluation changes before and after an AI move.
-- A comparison of candidate moves.
-- A predicted continuation of play.
+- Evaluation component breakdowns
+- Evaluation changes before and after an AI move
+- A comparison of candidate moves
+- A predicted continuation of play
 
 This makes it possible to inspect not only which move the engine selected, but also the search and evaluation information associated with that decision.
 
@@ -410,7 +528,6 @@ The application uses Python's standard library; no third-party runtime package i
 
 ```bash
 git clone https://github.com/Nomusa990822/Chess-AI.git
-
 cd Chess-AI
 ```
 
@@ -458,25 +575,13 @@ The tests help validate individual components and important game behaviours.
 
 ## 12 / Design Principles
 
-**Deterministic Rules, Heuristic Intelligence**
-
-The chess engine enforces explicit rules, while the AI uses search and evaluation to make decisions.
-
-**Separation of Concerns**
-
-Game-state management, search, evaluation and presentation are maintained in separate modules.
-
-**Interpretability**
-
-The engine exposes evaluation information and search diagnostics rather than presenting its selected move without context.
-
-**Computational Efficiency**
-
-Search optimisation techniques reduce unnecessary exploration and help the engine work within a time budget.
-
-**Testability**
-
-Individual components are tested independently, making correctness easier to inspect and maintain.
+| Principle | In practice |
+|---|---|
+| **Deterministic rules, heuristic intelligence** | The chess engine enforces explicit rules, while the AI uses search and evaluation to make decisions |
+| **Separation of concerns** | Game-state management, search, evaluation and presentation live in separate modules |
+| **Interpretability** | The engine exposes evaluation information and search diagnostics rather than presenting its move without context |
+| **Computational efficiency** | Search optimisations reduce unnecessary exploration and help the engine work within a time budget |
+| **Testability** | Individual components are tested independently, making correctness easier to inspect and maintain |
 
 ---
 
@@ -493,15 +598,15 @@ Individual components are tested independently, making correctness easier to ins
 
 ### Potential Improvements
 
-- Zobrist hashing for efficient position identification.
-- Killer-move and history heuristics.
-- Aspiration windows.
-- Opening-book integration.
-- Endgame tablebase support.
-- PGN import and export.
-- Graphical interface.
-- AI-versus-AI gameplay.
-- Optional machine-learning evaluation.
+- [ ] Zobrist hashing for efficient position identification
+- [ ] Killer-move and history heuristics
+- [ ] Aspiration windows
+- [ ] Opening-book integration
+- [ ] Endgame tablebase support
+- [ ] PGN import and export
+- [ ] Graphical interface
+- [ ] AI-versus-AI gameplay
+- [ ] Optional machine-learning evaluation
 
 ---
 
@@ -518,9 +623,7 @@ Additional technical documentation is available in the repository:
 
 **Nomusa Shongwe**
 
-[GitHub](https://github.com/Nomusa990822)
-
-[Chess-AI Repository](https://github.com/Nomusa990822/Chess-AI)
+[GitHub](https://github.com/Nomusa990822) · [Chess-AI Repository](https://github.com/Nomusa990822/Chess-AI)
 
 ---
 
@@ -531,5 +634,7 @@ Additional technical documentation is available in the repository:
 *Demonstrating how classical artificial intelligence can produce intelligent behaviour through search, optimisation and carefully designed evaluation.*
 
 **Built with Python.**
+
+<sub>[Back to top](#explainable-chess-ai)</sub>
 
 </div>
