@@ -35,7 +35,7 @@ def state_snapshot(gs):
         "castling_log": tuple(
             (r.wks, r.wqs, r.bks, r.bqs) for r in gs.castle_rights_log
         ),
-        "position_counts": dict(gs.position_counts),
+        "position_counts": dict(gs.position_counts),\n        "halfmove_clock": gs.halfmove_clock,\n        "halfmove_clock_log": tuple(gs.halfmove_clock_log),
     }
 
 
