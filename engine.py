@@ -528,20 +528,26 @@ class GameState:
                     moves.append(Move((row, col), (r, c), self.board))
 
     def get_castle_moves(self, row, col, moves):
+        # Rights alone are insufficient in custom positions: the king and
+        # relevant rook must still occupy their original squares.
+        home_row = 7 if self.white_to_move else 0
+        king = "wK" if self.white_to_move else "bK"
+        rook = "wR" if self.white_to_move else "bR"
+        if (row, col) != (home_row, 4) or self.board[row][col] != king:
+            return
         if self.square_under_attack(row, col, attacking_white=not self.white_to_move):
             return
 
         rights = self.current_castling_rights
         if self.white_to_move:
-            if rights.wks:
-                self.get_kingside_castle_moves(row, col, moves)
-            if rights.wqs:
-                self.get_queenside_castle_moves(row, col, moves)
+            kingside, queenside = rights.wks, rights.wqs
         else:
-            if rights.bks:
-                self.get_kingside_castle_moves(row, col, moves)
-            if rights.bqs:
-                self.get_queenside_castle_moves(row, col, moves)
+            kingside, queenside = rights.bks, rights.bqs
+
+        if kingside and self.board[home_row][7] == rook:
+            self.get_kingside_castle_moves(row, col, moves)
+        if queenside and self.board[home_row][0] == rook:
+            self.get_queenside_castle_moves(row, col, moves)
 
     def get_kingside_castle_moves(self, row, col, moves):
         if col + 2 < 8:
