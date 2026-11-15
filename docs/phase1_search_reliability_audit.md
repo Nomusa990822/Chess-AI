@@ -123,3 +123,19 @@ the same square colour. It does not claim that all other minor-piece endings are
 dead positions. Regression tests cover these recognised cases and a rook-positive
 control. The halfmove clock and its history are now included in perft state
 restoration snapshots.
+
+
+## Draw-rule precedence and state-history validation update
+
+Regression coverage now verifies that checkmate takes precedence over the 75-move
+automatic-draw threshold when both conditions are represented in the terminal
+position. Repetition-history undo is checked against an exact pre-move count
+snapshot, and castling rights are confirmed to distinguish otherwise identical
+board/side-to-move positions. Capture halfmove-clock reset and undo restoration
+are also tested. A three-occurrence position is explicitly distinguished from
+the five-occurrence automatic threshold.
+
+The engine continues to simplify threefold repetition and the 50-move rule as
+immediate search draws; tournament adjudication normally requires a claim for
+those thresholds. The tests validate the engine's documented search policy, not
+a complete FIDE arbiter implementation.
