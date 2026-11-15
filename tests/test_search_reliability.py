@@ -312,3 +312,89 @@ def test_root_pvs_matches_full_window_move_and_score(fen):
     assert pvs_info["score"] == pytest.approx(full_info["score"], abs=1e-9)
     assert pvs_move == full_move
     assert pvs_info["root_pvs_null_window_searches"] > 0
+
+
+
+@pytest.mark.parametrize("score,expected_counter", [
+    (10.0, "aspiration_fail_high"),
+    (-10.0, "aspiration_fail_low"),
+])
+def test_aspiration_window_retries_and_falls_back_to_exact_search(
+        monkeypatch, score, expected_counter):
+    gs = GameState()
+    legal_moves = gs.get_valid_moves()
+
+    def controlled_minimax(position, depth, alpha, beta, maximizing, mode,
+                           tt, stats, deadline, ply=0, use_pvs=True):
+        return (0.0 if depth == 0 else score), []
+
+    monkeypatch.setattr(ai, "minimax", controlled_minimax)
+    move, info = ai.choose_ai_move(
+        gs, legal_moves, max_depth=2, time_budget=10,
+        use_aspiration=True, aspiration_window=0.01,
+        max_aspiration_retries=2,
+    )
+
+    assert move in legal_moves
+    assert info["depth_reached"] == 2
+    assert info[expected_counter] >= 1
+    assert info["aspiration_retries"] >= 1
+    assert info["score"] == pytest.approx(score)
+
+
+@pytest.mark.parametrize("fen", [
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R b KQkq - 0 1",
+    "8/5pk1/6p1/8/3P4/5K2/8/8 w - - 0 1",
+])
+def test_pvs_aspiration_matches_full_window_move_score_and_legal_pv(fen):
+    from tests.test_perft import load_fen_position
+
+    def run(use_pvs, use_aspiration):
+        gs = load_fen_position(fen)
+        before = state_snapshot(gs)
+        legal = gs.get_valid_moves()
+        move, info = ai.choose_ai_move(
+            gs, legal, mode="fair", max_depth=2, time_budget=90,
+            use_pvs=use_pvs, use_aspiration=use_aspiration,
+            aspiration_window=0.5,
+        )
+        assert info["depth_reached"] == 2
+        assert move in legal
+        assert state_snapshot(gs) == before
+        return move.get_chess_notation(), info
+
+    full_move, full_info = run(False, False)
+    aspiration_move, aspiration_info = run(True, True)
+    assert aspiration_move == full_move
+    assert aspiration_info["score"] == pytest.approx(full_info["score"], abs=1e-9)
+    assert aspiration_info["principal_variation"]
+
+
+def test_timeout_during_aspiration_retry_preserves_previous_completed_iteration(monkeypatch):
+    gs = GameState()
+    legal_moves = gs.get_valid_moves()
+    calls = {"count": 0}
+    calls_per_iteration = len(legal_moves)
+
+    def timeout_on_retry(position, depth, alpha, beta, maximizing, mode,
+                         tt, stats, deadline, ply=0, use_pvs=True):
+        calls["count"] += 1
+        # Depth one completes; depth two fails high, then its retry times out.
+        if depth == 0:
+            return 0.0, []
+        if calls["count"] > calls_per_iteration * 2:
+            raise ai.SearchTimeout
+        return 10.0, []
+
+    monkeypatch.setattr(ai, "minimax", timeout_on_retry)
+    move, info = ai.choose_ai_move(
+        gs, legal_moves, max_depth=3, time_budget=10,
+        use_aspiration=True, aspiration_window=0.01,
+        max_aspiration_retries=3,
+    )
+    assert move in legal_moves
+    assert info["depth_reached"] == 1
+    assert info["completed_iterations"] == [1]
+    assert info["timed_out"] is True
+    assert state_snapshot(gs) == state_snapshot(GameState())
