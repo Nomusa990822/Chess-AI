@@ -191,3 +191,26 @@ Principal Variation Search (PVS) is deliberately deferred until these ordering
 changes are measured and independently validated. PVS relies on strong move
 ordering and null-window re-search correctness, so introducing it in the same
 change would make performance and correctness regressions harder to isolate.
+
+## Reproducible search benchmark baseline
+
+A fixed-position benchmark has been added at `benchmarks/search_benchmark.py`.
+It evaluates an opening, a complex middlegame, and a pawn endgame from fixed
+FENs. Each repetition creates a fresh game state and calls the public
+`choose_ai_move` entry point, so each run starts with a fresh transposition
+table. The JSON output records the FEN, completed depth, selected move, score,
+node and quiescence-node counts, alpha-beta prunes, transposition hits, elapsed
+time, and nodes per second. Position summaries use medians across repetitions.
+
+Elapsed time covers the complete `choose_ai_move` call, including its
+post-search explanation generation; it is therefore an end-to-end engine-call
+measurement, not isolated search-loop time. CI runs two repetitions at depth
+two to keep routine verification bounded. The script defaults to depth three
+and three repetitions for a more informative manual comparison.
+
+This is the reference measurement point for the upcoming PVS experiment. It
+must not be described as a pre-killer/history measurement: those heuristics
+were already present when this benchmark was introduced. Compare PVS against
+this same benchmark, on the same runner class and parameters, and report the
+raw per-position results as well as aggregate medians. Runtime measurements
+are environment-sensitive and do not establish playing strength or Elo.
