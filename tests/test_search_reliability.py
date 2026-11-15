@@ -308,6 +308,7 @@ def test_root_pvs_matches_full_window_move_and_score(fen):
     full_move, full_info = run(False)
     pvs_move, pvs_info = run(True)
 
+    assert pvs_info["score"] != float("inf") and pvs_info["score"] != -float("inf"), pvs_info
     assert pvs_info["score"] == pytest.approx(full_info["score"], abs=1e-9)
     assert pvs_move == full_move
     assert pvs_info["root_pvs_null_window_searches"] > 0
