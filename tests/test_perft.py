@@ -95,13 +95,38 @@ def load_fen_position(fen):
     return gs
 
 
+def engine_move_uci(move):
+    """Convert the engine coordinate move to UCI notation."""
+    files = "abcdefgh"
+    ranks = "87654321"
+    start = files[move.start_col] + ranks[move.start_row]
+    end = files[move.end_col] + ranks[move.end_row]
+    promotion = move.promotion_choice.lower() if move.is_pawn_promotion else ""
+    return start + end + promotion
+
+
+def test_kiwipete_legal_moves_match_python_chess_oracle():
+    """Compare root legal moves against an independent chess-rules implementation."""
+    import chess
+
+    fen = (
+        "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/"
+        "2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1"
+    )
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+
+    assert actual == expected, (
+        f"Missing legal moves: {sorted(expected - actual)}; "
+        f"unexpected moves: {sorted(actual - expected)}"
+    )
+
 def test_kiwipete_perft_castling_and_tactical_legality():
     """Kiwipete reference counts exercise castling and complex legal move filtering."""
     gs = load_fen_position(
         "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1"
     )
 
-    root_moves = gs.get_valid_moves()
-    actual = " ".join(sorted(m.get_chess_notation() for m in root_moves))
-    assert len(root_moves) == 48, actual
+    assert len(gs.get_valid_moves()) == 48
     assert perft(gs, 2) == 2039
