@@ -172,3 +172,22 @@ first implementation; its performance impact remains to be benchmarked.
 Regression tests assert that equal board identities with different halfmove
 clocks or repetition histories receive distinct cache keys, and that make/undo
 restores the original cache identity.
+
+
+## Search move-ordering and transposition replacement
+
+The transposition table now uses a depth-preferred replacement policy: a
+shallower result cannot overwrite a deeper result for the same history-aware
+key, and an exact entry can replace a bound entry at equal depth.
+
+Move ordering retains the existing hash-move and tactical priorities and adds
+two standard quiet-move heuristics. Killer moves are remembered per search ply
+when a quiet move causes an alpha-beta cutoff. A bounded history score is
+updated for the same quiet move and side-to-move context, with larger search
+depths receiving larger bonuses. These heuristics affect ordering only; they do
+not change position evaluation or legal move generation.
+
+Principal Variation Search (PVS) is deliberately deferred until these ordering
+changes are measured and independently validated. PVS relies on strong move
+ordering and null-window re-search correctness, so introducing it in the same
+change would make performance and correctness regressions harder to isolate.
