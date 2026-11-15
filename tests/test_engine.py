@@ -244,3 +244,52 @@ def test_draw_by_repetition_flag():
 
     gs.update_game_status()
     assert gs.draw_by_repetition is True
+
+
+def test_halfmove_clock_resets_and_restores_for_pawn_move():
+    gs = GameState()
+    gs.halfmove_clock = 17
+    gs.halfmove_clock_log = [17]
+    move = Move((6, 4), (4, 4), gs.board)
+    gs.make_move(move)
+    assert gs.halfmove_clock == 0
+    gs.undo_move()
+    assert gs.halfmove_clock == 17
+
+def test_quiet_move_increments_and_undo_restores_halfmove_clock():
+    gs = GameState()
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    assert gs.halfmove_clock == 1
+    gs.undo_move()
+    assert gs.halfmove_clock == 0
+
+def test_fifty_move_draw_flag_at_one_hundred_halfmoves():
+    gs = GameState()
+    gs.halfmove_clock = 99
+    gs.halfmove_clock_log = [99]
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    gs.update_game_status()
+    assert gs.halfmove_clock == 100
+    assert gs.draw_by_fifty_move is True
+
+def test_repetition_key_ignores_unusable_en_passant_target():
+    from test_perft import load_fen_position
+    a = load_fen_position('4k3/8/8/4p3/8/8/8/4K3 w - e6 0 1')
+    b = load_fen_position('4k3/8/8/4p3/8/8/8/4K3 w - - 0 1')
+    assert a.get_position_key() == b.get_position_key()
+
+def test_repetition_key_retains_legal_en_passant_right():
+    from test_perft import load_fen_position
+    a = load_fen_position('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
+    b = load_fen_position('4k3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
+    assert a.has_legal_en_passant()
+    assert a.get_position_key() != b.get_position_key()
+
+def test_repetition_key_ignores_pinned_en_passant_capture():
+    from test_perft import load_fen_position
+    a = load_fen_position('k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
+    b = load_fen_position('k3r3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
+    assert not a.has_legal_en_passant()
+    assert a.get_position_key() == b.get_position_key()
