@@ -196,3 +196,30 @@ def test_killer_history_state_does_not_mutate_game_position():
     ai._record_quiet_cutoff(gs, move, depth=2, ply=1, stats=stats)
     ai.order_moves(gs, gs.get_valid_moves(), ply=1, stats=stats)
     assert state_snapshot(gs) == before
+
+@pytest.mark.parametrize("black_to_move", [False, True])
+def test_pvs_matches_full_window_minimax_and_restores_state(black_to_move):
+    gs = GameState()
+    if black_to_move:
+        gs.make_move(gs.get_valid_moves()[0])
+    before = state_snapshot(gs)
+
+    def search(use_pvs):
+        stats = {
+            "nodes": 0, "prunes": 0, "tt_hits": 0, "q_nodes": 0,
+            "killer_moves": {}, "history_scores": {},
+            "pvs_null_window_searches": 0, "pvs_researches": 0,
+        }
+        score, pv = ai.minimax(
+            gs, 3, -float("inf"), float("inf"), gs.white_to_move,
+            "fair", {}, stats, time.monotonic() + 30, use_pvs=use_pvs
+        )
+        return score, pv, stats
+
+    reference_score, _, _ = search(False)
+    pvs_score, pvs_line, pvs_stats = search(True)
+
+    assert pvs_score == pytest.approx(reference_score, abs=1e-9)
+    assert pvs_line
+    assert pvs_stats["pvs_null_window_searches"] > 0
+    assert state_snapshot(gs) == before
