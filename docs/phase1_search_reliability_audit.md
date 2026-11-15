@@ -61,3 +61,16 @@ Timeouts can occur at arbitrary recursion points. Tests must assert that the boa
 ## Audit limitations
 
 This is a source-level audit. No local project environment or GitHub Actions execution was available during this inspection, so no new runtime or performance claims are made.
+
+
+## Perft validation update
+
+The first complex-position fixture was labelled Kiwipete and asserted the commonly
+quoted 48/2039 node counts. An independent python-chess comparison established
+that the exact FEN stored in that test has 45 legal root moves, and the engine's
+root legal-move set matches the oracle exactly. The discrepancy was therefore in
+the fixture/reference-count pairing, not a demonstrated root move-generation
+defect. The test has been corrected to compare recursive perft counts at depths
+1–3 against python-chess for the exact FEN. This avoids asserting reference
+counts that do not belong to the tested position. The independent library is
+installed only in CI as a test oracle; it is not a runtime dependency.
