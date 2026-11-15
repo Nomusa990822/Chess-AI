@@ -369,3 +369,54 @@ def test_material_with_rook_is_not_insufficient():
 def test_opposite_colour_bishops_are_not_assumed_dead():
     gs = _load_repetition_fen("4k3/8/8/8/8/8/8/2B1K2b w - - 0 1")
     assert not gs.is_insufficient_material()
+
+
+def test_checkmate_takes_precedence_over_seventyfive_move_draw():
+    """FIDE's 75-move automatic draw does not override checkmate on the last move."""
+    from ai import CHECKMATE_SCORE, _terminal_score
+
+    gs = _load_repetition_fen("7k/6Q1/5K2/8/8/8/8/8 b - - 150 1")
+    score = _terminal_score(gs, ply=0)
+
+    assert gs.checkmate is True
+    assert gs.draw_by_seventyfive_move is True
+    assert score == -CHECKMATE_SCORE
+
+
+def test_undo_restores_repetition_counts_exactly():
+    gs = GameState()
+    before = dict(gs.position_counts)
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    assert len(gs.position_counts) == 2
+    gs.undo_move()
+    assert gs.position_counts == before
+
+
+def test_castling_rights_are_part_of_repetition_identity():
+    with_rights = _load_repetition_fen("4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1")
+    without_rights = _load_repetition_fen("4k3/8/8/8/8/8/8/R3K2R w - - 0 1")
+    assert with_rights.get_position_key() != without_rights.get_position_key()
+
+
+def test_capture_resets_halfmove_clock_and_undo_restores_it():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/4p3/4K3 w - - 37 1")
+    # White king captures the adjacent black pawn.
+    move = Move((7, 4), (6, 4), gs.board)
+    gs.make_move(move)
+    assert gs.halfmove_clock == 0
+    gs.undo_move()
+    assert gs.halfmove_clock == 37
+
+
+def test_threefold_claim_threshold_is_distinct_from_fivefold_automatic():
+    gs = GameState()
+    for _ in range(2):
+        gs.make_move(Move((7, 6), (5, 5), gs.board))
+        gs.make_move(Move((0, 6), (2, 5), gs.board))
+        gs.make_move(Move((5, 5), (7, 6), gs.board))
+        gs.make_move(Move((2, 5), (0, 6), gs.board))
+    gs.update_game_status()
+    assert gs.position_counts[gs.get_position_key()] == 3
+    assert gs.draw_by_repetition is True
+    assert gs.draw_by_fivefold_repetition is False
