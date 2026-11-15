@@ -36,7 +36,7 @@ POSITIONS = (
 )
 
 
-def run_benchmark(depth, repeats):
+def run_benchmark(depth, repeats, use_pvs=True):
     results = []
     for name, fen in POSITIONS:
         samples = []
@@ -48,7 +48,7 @@ def run_benchmark(depth, repeats):
             started = time.perf_counter()
             move, info = choose_ai_move(
                 state, legal_moves, mode="fair", max_depth=depth,
-                time_budget=120.0,
+                time_budget=120.0, use_pvs=use_pvs,
             )
             elapsed = time.perf_counter() - started
             if info["depth_reached"] != depth:
@@ -65,6 +65,8 @@ def run_benchmark(depth, repeats):
                 "q_nodes": info["q_nodes"],
                 "prunes": info["prunes"],
                 "tt_hits": info["tt_hits"],
+                "pvs_null_window_searches": info["pvs_null_window_searches"],
+                "pvs_researches": info["pvs_researches"],
                 "nodes_per_second": info["nodes"] / elapsed if elapsed else 0.0,
             })
             last_info = info
@@ -85,6 +87,8 @@ def run_benchmark(depth, repeats):
             "median_q_nodes": statistics.median(s["q_nodes"] for s in samples),
             "median_prunes": statistics.median(s["prunes"] for s in samples),
             "median_tt_hits": statistics.median(s["tt_hits"] for s in samples),
+            "median_pvs_null_window_searches": statistics.median(s["pvs_null_window_searches"] for s in samples),
+            "median_pvs_researches": statistics.median(s["pvs_researches"] for s in samples),
             "samples": samples,
         })
     return results
@@ -94,15 +98,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--search-mode", choices=("pvs", "full-window"), default="pvs")
     args = parser.parse_args()
     if args.depth < 1 or args.repeats < 1:
         parser.error("--depth and --repeats must both be positive")
     print(json.dumps({
-        "benchmark": "phase1-search-ordering-baseline",
+        "benchmark": "phase1-pvs-comparison",
+        "search_mode": args.search_mode,
         "measurement": "complete choose_ai_move call, including explanation",
         "depth": args.depth,
         "repeats": args.repeats,
-        "results": run_benchmark(args.depth, args.repeats),
+        "results": run_benchmark(args.depth, args.repeats, use_pvs=args.search_mode == "pvs"),
     }, indent=2))
 
 
