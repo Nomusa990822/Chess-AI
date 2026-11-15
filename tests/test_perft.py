@@ -102,5 +102,6 @@ def test_kiwipete_perft_castling_and_tactical_legality():
     )
 
     root_moves = gs.get_valid_moves()
-    assert len(root_moves) == 48, sorted(m.get_chess_notation() for m in root_moves)
+    actual = " ".join(sorted(m.get_chess_notation() for m in root_moves))
+    assert len(root_moves) == 48, actual
     assert perft(gs, 2) == 2039
