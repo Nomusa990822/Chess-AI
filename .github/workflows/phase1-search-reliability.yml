@@ -9,6 +9,7 @@ on:
       - "engine.py"
       - "evaluation.py"
       - "tests/**"
+      - "benchmarks/**"
       - ".github/workflows/phase1-search-reliability.yml"
   pull_request:
     branches:
@@ -51,3 +52,6 @@ jobs:
 
       - name: Run complete test suite
         run: python -m pytest -v
+
+      - name: Run fixed-position search benchmark
+        run: python benchmarks/search_benchmark.py --depth 2 --repeats 2
