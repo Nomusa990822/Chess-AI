@@ -276,3 +276,41 @@ making PVS the default. It therefore remains available for controlled
 experiments while the production/default path continues using the existing
 full-window search. A deeper paired benchmark is needed before reconsidering
 that decision; no strength or Elo claim is inferred from these timings.
+
+
+### Expanded PVS correctness verification
+
+The follow-up regression batch broadens the PVS/full-window equivalence check
+beyond the initial position. Three fixed positions are now compared: the
+complex middlegame with White to move, the same position with Black to move,
+and the pawn ending. Each comparison requires scores to agree within
+(10^{-9}), replays every move in the PVS principal variation against the
+engine's legal-move generator, and verifies exact state restoration after
+undoing the replay. Separate timeout tests confirm that both full-window and
+PVS modes retain a legal fallback, report depth zero when the deadline is
+already expired, and leave the supplied position unchanged.
+
+Workflow
+[43776068475](https://github.com/Nomusa990822/Chess-AI/actions/runs/43776068475)
+passed on commit
+[04f6e130c6603974eded9427fc1936545f314e0e](https://github.com/Nomusa990822/Chess-AI/commit/04f6e130c6603974eded9427fc1936545f314e0e):
+99 tests passed in 19.27 seconds, application compilation passed, and both
+fixed-position benchmark modes completed successfully.
+
+The paired depth-two benchmark on this run reported these median end-to-end
+times (seconds) and node counts:
+
+| Position | Full-window time | PVS time | Full-window nodes | PVS nodes |
+|---|---:|---:|---:|---:|
+| Opening | 0.3034 | 0.3625 | 193 | 221 |
+| Middlegame | 2.2568 | 2.2275 | 174 | 175 |
+| Endgame | 0.0561 | 0.0588 | 58 | 62 |
+
+The two modes selected the same final move in each position and their scores
+matched in the benchmark. PVS was slower in the opening and endgame, marginally
+faster in the middlegame, and searched more nodes in all three cases. This
+single shallow run does not establish a repeatable speedup; PVS therefore
+remains opt-in and full-window alpha-beta remains the default. The earlier
+statement that PVS was deferred describes the stage before this later opt-in
+experiment and is superseded by the implementation and verification sections
+above.
