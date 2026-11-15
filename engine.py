@@ -338,7 +338,7 @@ class GameState:
             return True
         if len(pieces) == 1 and pieces[0][0][1] in ("B", "N"):
             return True
-        if pieces and all(piece[0][1] == "B" for piece, _, _ in pieces):
+        if pieces and all(piece[1] == "B" for piece, _, _ in pieces):
             square_colours = {(row + col) % 2 for _, row, col in pieces}
             return len(square_colours) == 1
         return False
