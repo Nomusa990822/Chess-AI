@@ -284,3 +284,30 @@ def test_choose_move_expired_deadline_preserves_state_in_both_search_modes(use_p
     assert info["depth_reached"] == 0
     assert info["timed_out"] is True
     assert state_snapshot(gs) == before
+
+
+@pytest.mark.parametrize("fen", [
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R b KQkq - 0 1",
+    "8/5pk1/6p1/8/3P4/5K2/8/8 w - - 0 1",
+])
+def test_root_pvs_matches_full_window_move_and_score(fen):
+    from tests.test_perft import load_fen_position
+
+    def run(use_pvs):
+        gs = load_fen_position(fen)
+        moves = gs.get_valid_moves()
+        move, info = ai.choose_ai_move(
+            gs, moves, mode="fair", max_depth=2, time_budget=60,
+            use_pvs=use_pvs
+        )
+        assert move in moves
+        assert info["depth_reached"] == 2
+        return move.get_chess_notation(), info
+
+    full_move, full_info = run(False)
+    pvs_move, pvs_info = run(True)
+
+    assert pvs_info["score"] == pytest.approx(full_info["score"], abs=1e-9)
+    assert pvs_move == full_move
+    assert pvs_info["root_pvs_null_window_searches"] > 0
