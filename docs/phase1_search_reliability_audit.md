@@ -139,3 +139,19 @@ The engine continues to simplify threefold repetition and the 50-move rule as
 immediate search draws; tournament adjudication normally requires a claim for
 those thresholds. The tests validate the engine's documented search policy, not
 a complete FIDE arbiter implementation.
+
+
+## Deterministic game-history oracle validation
+
+A deterministic multi-game regression now plays legal moves selected from
+python-chess and compares the engine's complete legal-move set at every ply.
+After each move it also compares the halfmove clock, threefold-repetition
+detection, and fivefold-repetition detection with python-chess. Four fixed random
+seeds make failures reproducible while exercising varied pawn moves, captures,
+and evolving castling/en-passant rights. Insufficient-material validation is
+one-sided by design: the conservative engine detector may return false for a
+dead position, but it must not return true when python-chess considers the
+position live.
+
+This is a bounded deterministic sample, not exhaustive proof over all legal
+games or a full formal verification of repetition adjudication.
