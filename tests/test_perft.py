@@ -259,3 +259,51 @@ def test_checkmate_and_stalemate_flags_match_terminal_fens():
     assert stalemate.get_valid_moves() == []
     assert stalemate.checkmate is False
     assert stalemate.stalemate is True
+
+
+def test_repetition_and_move_state_track_python_chess_over_legal_games():
+    """Compare legal moves, repetition claims, and clocks across deterministic games."""
+    import random
+    import chess
+    from engine import Move
+
+    for seed in (3, 17, 41, 89):
+        rng = random.Random(seed)
+        oracle = chess.Board()
+        gs = GameState()
+
+        for ply in range(100):
+            oracle_moves = {move.uci() for move in oracle.legal_moves}
+            engine_moves = {
+                engine_move_uci(move): move for move in gs.get_valid_moves()
+            }
+            assert set(engine_moves) == oracle_moves, (
+                f"seed={seed}, ply={ply}: legal move mismatch; "
+                f"missing={sorted(oracle_moves - set(engine_moves))}, "
+                f"extra={sorted(set(engine_moves) - oracle_moves)}"
+            )
+
+            if not oracle_moves:
+                break
+
+            selected = rng.choice(list(oracle.legal_moves))
+            uci = selected.uci()
+            gs.make_move(engine_moves[uci])
+            oracle.push(selected)
+
+            gs.update_game_status()
+            assert gs.halfmove_clock == oracle.halfmove_clock, (
+                f"seed={seed}, ply={ply}: halfmove clock mismatch"
+            )
+            assert gs.draw_by_repetition == oracle.is_repetition(3), (
+                f"seed={seed}, ply={ply}: threefold repetition mismatch"
+            )
+            assert gs.draw_by_fivefold_repetition == oracle.is_fivefold_repetition(), (
+                f"seed={seed}, ply={ply}: fivefold repetition mismatch"
+            )
+            # The engine's dead-position detector is intentionally conservative:
+            # it may miss a dead position, but must never declare a live one dead.
+            if gs.draw_by_insufficient_material:
+                assert oracle.is_insufficient_material(), (
+                    f"seed={seed}, ply={ply}: false insufficient-material draw"
+                )
