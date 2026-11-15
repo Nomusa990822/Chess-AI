@@ -68,6 +68,12 @@ def get_tactical_moves(gs, moves):
     return order_moves(gs, [m for m in moves if is_tactical_move(m)])
 
 
+def _transposition_key(gs):
+    """Include draw-relevant game history in the cache identity."""
+    repetition_context = tuple(sorted(gs.position_counts.items()))
+    return (gs.get_position_key(), gs.halfmove_clock, repetition_context)
+
+
 def _terminal_score(gs, ply):
     """Return a white-perspective terminal score, or None for non-terminal."""
     gs.update_game_status()
@@ -99,8 +105,10 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
     best_line = []
 
     for depth in range(1, max(0, max_depth) + 1):
-        root_moves = order_moves(gs, valid_moves, tt.get(gs.get_position_key()).best_move
-                                 if gs.get_position_key() in tt else None)
+        root_key = _transposition_key(gs)
+        root_entry = tt.get(root_key)
+        root_moves = order_moves(gs, valid_moves,
+                                 root_entry.best_move if root_entry else None)
         if not root_moves:
             best_move = None
             break
@@ -184,7 +192,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
                                  deadline, ply=ply), []
 
     original_alpha, original_beta = alpha, beta
-    key = gs.get_position_key()
+    key = _transposition_key(gs)
     entry = tt.get(key)
     if entry is not None and entry.depth >= depth:
         stats["tt_hits"] += 1
