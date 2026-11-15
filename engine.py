@@ -138,6 +138,9 @@ class GameState:
         self.stalemate = False
         self.draw_by_repetition = False
         self.draw_by_fifty_move = False
+        self.draw_by_seventyfive_move = False
+        self.draw_by_fivefold_repetition = False
+        self.draw_by_insufficient_material = False
         self.halfmove_clock = 0
         self.halfmove_clock_log = [0]
 
@@ -267,6 +270,9 @@ class GameState:
         self.stalemate = False
         self.draw_by_repetition = False
         self.draw_by_fifty_move = False
+        self.draw_by_seventyfive_move = False
+        self.draw_by_fivefold_repetition = False
+        self.draw_by_insufficient_material = False
 
     def update_castle_rights(self, move):
         """
@@ -313,8 +319,29 @@ class GameState:
         """
         _ = self.get_valid_moves()
         key = self.get_position_key()
-        self.draw_by_repetition = self.position_counts.get(key, 0) >= 3
+        occurrences = self.position_counts.get(key, 0)
+        self.draw_by_repetition = occurrences >= 3
+        self.draw_by_fivefold_repetition = occurrences >= 5
         self.draw_by_fifty_move = self.halfmove_clock >= 100
+        self.draw_by_seventyfive_move = self.halfmove_clock >= 150
+        self.draw_by_insufficient_material = self.is_insufficient_material()
+
+    def is_insufficient_material(self):
+        """Conservatively detect standard dead positions from remaining material."""
+        pieces = [
+            (piece, row, col)
+            for row in range(8)
+            for col in range(8)
+            if (piece := self.board[row][col]) != "--" and piece[1] != "K"
+        ]
+        if not pieces:
+            return True
+        if len(pieces) == 1 and pieces[0][0][1] in ("B", "N"):
+            return True
+        if pieces and all(piece[0][1] == "B" for piece, _, _ in pieces):
+            square_colours = {(row + col) % 2 for _, row, col in pieces}
+            return len(square_colours) == 1
+        return False
 
     def has_legal_en_passant(self):
         """Return True only when a legal en-passant capture exists."""
