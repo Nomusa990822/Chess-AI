@@ -204,3 +204,54 @@ def test_all_promotion_choices_match_python_chess():
     actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
     assert actual == expected
     assert {move[-1] for move in actual if move.startswith("a7a8")} == set("qrbn")
+
+
+def test_black_to_move_complex_position_matches_python_chess():
+    """The independent oracle must agree when the side to move is black."""
+    import chess
+
+    fen = (
+        "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/"
+        "2N2N2/PPQBBPPP/R3K2R b KQkq - 0 1"
+    )
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+
+
+def test_castling_through_attacked_transit_square_is_rejected():
+    """A rook attack on f1 prevents white kingside castling."""
+    import chess
+
+    fen = "4kr2/8/8/8/8/8/8/4K2R w K - 0 1"
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+    assert "e1g1" not in actual
+
+
+def test_black_pawn_generates_all_four_promotion_choices():
+    """Black promotions must offer queen, rook, bishop, and knight."""
+    import chess
+
+    fen = "4k3/8/8/8/8/8/7p/4K3 b - - 0 1"
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+    assert {move[-1] for move in actual if move.startswith("h2h1")} == set("qrbn")
+
+
+def test_checkmate_and_stalemate_flags_match_terminal_fens():
+    """Terminal-position classification must distinguish mate from stalemate."""
+    mate = load_fen_position("7k/6Q1/5K2/8/8/8/8/8 b - - 0 1")
+    assert mate.get_valid_moves() == []
+    assert mate.checkmate is True
+    assert mate.stalemate is False
+
+    stalemate = load_fen_position("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")
+    assert stalemate.get_valid_moves() == []
+    assert stalemate.checkmate is False
+    assert stalemate.stalemate is True
