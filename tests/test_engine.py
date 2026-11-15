@@ -274,22 +274,58 @@ def test_fifty_move_draw_flag_at_one_hundred_halfmoves():
     assert gs.halfmove_clock == 100
     assert gs.draw_by_fifty_move is True
 
+
+def _load_repetition_fen(fen):
+    """Build a minimal GameState from a FEN fixture for repetition-key tests."""
+    from engine import CastleRights
+
+    gs = GameState()
+    fields = fen.split()
+    board = []
+    for fen_row in fields[0].split("/"):
+        row = []
+        for symbol in fen_row:
+            if symbol.isdigit():
+                row.extend(["--"] * int(symbol))
+            else:
+                row.append(("w" if symbol.isupper() else "b") + symbol.upper())
+        board.append(row)
+    gs.board = board
+    gs.white_to_move = fields[1] == "w"
+    rights = fields[2]
+    gs.current_castling_rights = CastleRights(
+        "K" in rights, "Q" in rights, "k" in rights, "q" in rights
+    )
+    gs.castle_rights_log = [gs.current_castling_rights.copy()]
+    files, ranks = "abcdefgh", "87654321"
+    ep = fields[3]
+    gs.en_passant_possible = () if ep == "-" else (ranks.index(ep[1]), files.index(ep[0]))
+    gs.en_passant_possible_log = [gs.en_passant_possible]
+    gs.halfmove_clock = int(fields[4]) if len(fields) > 4 else 0
+    gs.halfmove_clock_log = [gs.halfmove_clock]
+    for r in range(8):
+        for col in range(8):
+            if gs.board[r][col] == "wK":
+                gs.white_king_location = (r, col)
+            elif gs.board[r][col] == "bK":
+                gs.black_king_location = (r, col)
+    gs.position_counts = {}
+    gs.record_current_position()
+    return gs
+
 def test_repetition_key_ignores_unusable_en_passant_target():
-    from test_perft import load_fen_position
-    a = load_fen_position('4k3/8/8/4p3/8/8/8/4K3 w - e6 0 1')
-    b = load_fen_position('4k3/8/8/4p3/8/8/8/4K3 w - - 0 1')
+    a = _load_repetition_fen('4k3/8/8/4p3/8/8/8/4K3 w - e6 0 1')
+    b = _load_repetition_fen('4k3/8/8/4p3/8/8/8/4K3 w - - 0 1')
     assert a.get_position_key() == b.get_position_key()
 
 def test_repetition_key_retains_legal_en_passant_right():
-    from test_perft import load_fen_position
-    a = load_fen_position('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
+    a = _load_repetition_fen('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
     b = load_fen_position('4k3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
     assert a.has_legal_en_passant()
     assert a.get_position_key() != b.get_position_key()
 
 def test_repetition_key_ignores_pinned_en_passant_capture():
-    from test_perft import load_fen_position
-    a = load_fen_position('k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
+    a = _load_repetition_fen('k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
     b = load_fen_position('k3r3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
     assert not a.has_legal_en_passant()
     assert a.get_position_key() == b.get_position_key()
