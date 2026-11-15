@@ -101,5 +101,6 @@ def test_kiwipete_perft_castling_and_tactical_legality():
         "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1"
     )
 
-    assert perft(gs, 1) == 48
+    root_moves = gs.get_valid_moves()
+    assert len(root_moves) == 48, sorted(m.get_chess_notation() for m in root_moves)
     assert perft(gs, 2) == 2039
