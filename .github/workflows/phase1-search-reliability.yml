@@ -60,5 +60,7 @@ jobs:
         run: |
           python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode full-window
           python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode pvs
+          python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode pvs-aspiration
           python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode full-window
           python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode pvs
+          python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode pvs-aspiration
