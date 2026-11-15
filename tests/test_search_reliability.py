@@ -128,3 +128,30 @@ def test_completed_iteration_is_preserved_when_next_depth_times_out(monkeypatch)
     assert info["depth_reached"] == 1
     assert info["completed_iterations"] == [1]
     assert info["timed_out"] is True
+
+
+def test_transposition_key_distinguishes_halfmove_clocks():
+    gs = GameState()
+    same_position = GameState()
+    same_position.halfmove_clock = 42
+    assert gs.get_position_key() == same_position.get_position_key()
+    assert ai._transposition_key(gs) != ai._transposition_key(same_position)
+
+
+def test_transposition_key_distinguishes_repetition_histories():
+    gs = GameState()
+    alternate_history = GameState()
+    shared_position = gs.get_position_key()
+    alternate_history.position_counts[shared_position] = 2
+    assert gs.get_position_key() == alternate_history.get_position_key()
+    assert ai._transposition_key(gs) != ai._transposition_key(alternate_history)
+
+
+def test_transposition_key_restores_after_make_undo():
+    gs = GameState()
+    original_key = ai._transposition_key(gs)
+    move = gs.get_valid_moves()[0]
+    gs.make_move(move)
+    assert ai._transposition_key(gs) != original_key
+    gs.undo_move()
+    assert ai._transposition_key(gs) == original_key
