@@ -329,3 +329,57 @@ def test_repetition_key_ignores_pinned_en_passant_capture():
     b = _load_repetition_fen('k3r3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
     assert not a.has_legal_en_passant()
     assert a.get_position_key() == b.get_position_key()
+
+def test_seventyfive_move_automatic_draw_at_150_halfmoves():
+    gs = GameState()
+    gs.halfmove_clock = 149
+    gs.halfmove_clock_log = [149]
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    gs.update_game_status()
+    assert gs.draw_by_seventyfive_move is True
+    assert gs.draw_by_fifty_move is True
+
+
+def test_fivefold_repetition_automatic_threshold():
+    gs = GameState()
+    move1 = Move((7, 6), (5, 5), gs.board)
+    move2 = Move((0, 6), (2, 5), gs.board)
+    move3 = Move((5, 5), (7, 6), gs.board)
+    move4 = Move((2, 5), (0, 6), gs.board)
+    for _ in range(4):
+        gs.make_move(move1)
+        gs.make_move(move2)
+        gs.make_move(move3)
+        gs.make_move(move4)
+    gs.update_game_status()
+    assert gs.draw_by_repetition is True
+    assert gs.draw_by_fivefold_repetition is True
+
+
+def test_insufficient_material_kings_only():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1")
+    gs.update_game_status()
+    assert gs.draw_by_insufficient_material is True
+
+
+def test_insufficient_material_single_bishop_or_knight():
+    bishop = _load_repetition_fen("4k3/8/8/8/8/8/8/3BK3 w - - 0 1")
+    knight = _load_repetition_fen("4k3/8/8/8/8/8/8/3NK3 w - - 0 1")
+    assert bishop.is_insufficient_material()
+    assert knight.is_insufficient_material()
+
+
+def test_insufficient_material_same_colour_bishops_only():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/2B1KB2 w - - 0 1")
+    assert gs.is_insufficient_material()
+
+
+def test_material_with_rook_is_not_insufficient():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/3RK3 w - - 0 1")
+    assert not gs.is_insufficient_material()
+
+
+def test_opposite_colour_bishops_are_not_assumed_dead():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/2B1K2b w - - 0 1")
+    assert not gs.is_insufficient_material()
