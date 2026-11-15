@@ -169,7 +169,7 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
                 try:
                     if use_pvs and iteration_scores and ((not gs.white_to_move and alpha != -float("inf")) or (gs.white_to_move and beta != float("inf"))):
                         stats["root_pvs_null_window_searches"] += 1
-                        if gs.white_to_move:
+                        if not gs.white_to_move:
                             score, child_pv = minimax(
                                 gs, depth - 1, alpha, min(beta, alpha + PVS_WINDOW),
                                 gs.white_to_move, mode, tt, stats, deadline,
