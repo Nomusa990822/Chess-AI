@@ -137,7 +137,8 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
         "top_lines": [], "principal_variation": [],
         "phase": get_game_phase(gs.board), "timed_out": False,
         "completed_iterations": [], "killer_moves": {}, "history_scores": {},
-        "pvs_null_window_searches": 0, "pvs_researches": 0
+        "pvs_null_window_searches": 0, "pvs_researches": 0,
+        "root_pvs_null_window_searches": 0, "root_pvs_researches": 0
     }
 
     best_move = valid_moves[0] if valid_moves else None
@@ -166,10 +167,31 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
                 _check_deadline(deadline)
                 gs.make_move(move)
                 try:
-                    score, child_pv = minimax(
-                        gs, depth - 1, alpha, beta, gs.white_to_move,
-                        mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
-                    )
+                    if use_pvs and iteration_scores:
+                        stats["root_pvs_null_window_searches"] += 1
+                        if gs.white_to_move:
+                            score, child_pv = minimax(
+                                gs, depth - 1, alpha, min(beta, alpha + PVS_WINDOW),
+                                gs.white_to_move, mode, tt, stats, deadline,
+                                ply=1, use_pvs=use_pvs
+                            )
+                        else:
+                            score, child_pv = minimax(
+                                gs, depth - 1, max(alpha, beta - PVS_WINDOW), beta,
+                                gs.white_to_move, mode, tt, stats, deadline,
+                                ply=1, use_pvs=use_pvs
+                            )
+                        if alpha < score < beta:
+                            stats["root_pvs_researches"] += 1
+                            score, child_pv = minimax(
+                                gs, depth - 1, alpha, beta, gs.white_to_move,
+                                mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
+                            )
+                    else:
+                        score, child_pv = minimax(
+                            gs, depth - 1, alpha, beta, gs.white_to_move,
+                            mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
+                        )
                 finally:
                     gs.undo_move()
 
