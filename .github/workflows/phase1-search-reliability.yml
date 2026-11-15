@@ -10,6 +10,7 @@ on:
       - "evaluation.py"
       - "tests/**"
       - "benchmarks/**"
+      - "docs/**"
       - ".github/workflows/phase1-search-reliability.yml"
   pull_request:
     branches:
@@ -19,6 +20,8 @@ on:
       - "engine.py"
       - "evaluation.py"
       - "tests/**"
+      - "benchmarks/**"
+      - "docs/**"
       - ".github/workflows/phase1-search-reliability.yml"
   workflow_dispatch:
 
@@ -57,3 +60,5 @@ jobs:
         run: |
           python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode full-window
           python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode pvs
+          python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode full-window
+          python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode pvs
