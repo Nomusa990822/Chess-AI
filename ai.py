@@ -126,7 +126,7 @@ def _terminal_score(gs, ply):
     return None
 
 
-def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=False):
+def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=False, use_aspiration=False, aspiration_window=0.5, max_aspiration_retries=4):
     """Return (best_move, search_info); only fully completed depths are published."""
     started = time.monotonic()
     deadline = started + max(0.0, time_budget)
@@ -138,7 +138,9 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
         "phase": get_game_phase(gs.board), "timed_out": False,
         "completed_iterations": [], "killer_moves": {}, "history_scores": {},
         "pvs_null_window_searches": 0, "pvs_researches": 0,
-        "root_pvs_null_window_searches": 0, "root_pvs_researches": 0
+        "root_pvs_null_window_searches": 0, "root_pvs_researches": 0,
+        "aspiration_searches": 0, "aspiration_retries": 0,
+        "aspiration_fail_low": 0, "aspiration_fail_high": 0
     }
 
     best_move = valid_moves[0] if valid_moves else None
@@ -155,69 +157,102 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
             best_move = None
             break
 
-        iteration_best_move = None
-        iteration_best_score = -float("inf") if gs.white_to_move else float("inf")
-        iteration_best_line = []
-        iteration_scores = []
-        alpha, beta = -float("inf"), float("inf")
+        use_window = use_aspiration and stats["depth_reached"] > 0
+        window = max(float(aspiration_window), PVS_WINDOW)
+        alpha = best_score - window if use_window else -float("inf")
+        beta = best_score + window if use_window else float("inf")
+        attempt = 0
+        iteration_complete = False
 
         try:
-            _check_deadline(deadline)
-            for move in root_moves:
+            while True:
+                if use_window:
+                    stats["aspiration_searches"] += 1
+                window_alpha, window_beta = alpha, beta
+                iteration_best_move = None
+                iteration_best_score = -float("inf") if gs.white_to_move else float("inf")
+                iteration_best_line = []
+                iteration_scores = []
                 _check_deadline(deadline)
-                gs.make_move(move)
-                try:
-                    if use_pvs and iteration_scores and ((not gs.white_to_move and alpha != -float("inf")) or (gs.white_to_move and beta != float("inf"))):
-                        stats["root_pvs_null_window_searches"] += 1
-                        if not gs.white_to_move:
-                            score, child_pv = minimax(
-                                gs, depth - 1, alpha, min(beta, alpha + PVS_WINDOW),
-                                gs.white_to_move, mode, tt, stats, deadline,
-                                ply=1, use_pvs=use_pvs
-                            )
+
+                for move in root_moves:
+                    _check_deadline(deadline)
+                    gs.make_move(move)
+                    try:
+                        if use_pvs and iteration_scores and (
+                            (not gs.white_to_move and alpha != -float("inf"))
+                            or (gs.white_to_move and beta != float("inf"))
+                        ):
+                            stats["root_pvs_null_window_searches"] += 1
+                            if not gs.white_to_move:
+                                score, child_pv = minimax(
+                                    gs, depth - 1, alpha, min(beta, alpha + PVS_WINDOW),
+                                    gs.white_to_move, mode, tt, stats, deadline,
+                                    ply=1, use_pvs=use_pvs
+                                )
+                            else:
+                                score, child_pv = minimax(
+                                    gs, depth - 1, max(alpha, beta - PVS_WINDOW), beta,
+                                    gs.white_to_move, mode, tt, stats, deadline,
+                                    ply=1, use_pvs=use_pvs
+                                )
+                            if alpha < score < beta:
+                                stats["root_pvs_researches"] += 1
+                                score, child_pv = minimax(
+                                    gs, depth - 1, alpha, beta, gs.white_to_move,
+                                    mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
+                                )
                         else:
-                            score, child_pv = minimax(
-                                gs, depth - 1, max(alpha, beta - PVS_WINDOW), beta,
-                                gs.white_to_move, mode, tt, stats, deadline,
-                                ply=1, use_pvs=use_pvs
-                            )
-                        if alpha < score < beta:
-                            stats["root_pvs_researches"] += 1
                             score, child_pv = minimax(
                                 gs, depth - 1, alpha, beta, gs.white_to_move,
                                 mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
                             )
+                    finally:
+                        gs.undo_move()
+
+                    _check_deadline(deadline)
+                    line = [move.get_chess_notation()] + child_pv
+                    iteration_scores.append((move, score, line))
+                    better = (
+                        iteration_best_move is None
+                        or (score > iteration_best_score if gs.white_to_move
+                            else score < iteration_best_score)
+                    )
+                    if better:
+                        iteration_best_move = move
+                        iteration_best_score = score
+                        iteration_best_line = line
+
+                    if gs.white_to_move:
+                        alpha = max(alpha, iteration_best_score)
                     else:
-                        score, child_pv = minimax(
-                            gs, depth - 1, alpha, beta, gs.white_to_move,
-                            mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
-                        )
-                finally:
-                    gs.undo_move()
+                        beta = min(beta, iteration_best_score)
 
-                _check_deadline(deadline)
-                line = [move.get_chess_notation()] + child_pv
-                iteration_scores.append((move, score, line))
+                fail_low = use_window and iteration_best_score <= window_alpha
+                fail_high = use_window and iteration_best_score >= window_beta
+                if not fail_low and not fail_high:
+                    iteration_complete = True
+                    break
 
-                better = (iteration_best_move is None or
-                          (score > iteration_best_score if gs.white_to_move
-                           else score < iteration_best_score))
-                if better:
-                    iteration_best_move = move
-                    iteration_best_score = score
-                    iteration_best_line = line
-
-                if gs.white_to_move:
-                    alpha = max(alpha, iteration_best_score)
-                else:
-                    beta = min(beta, iteration_best_score)
+                if fail_low:
+                    stats["aspiration_fail_low"] += 1
+                    alpha = (window_alpha - window * (2 ** (attempt + 1))
+                             if attempt < max_aspiration_retries else -float("inf"))
+                if fail_high:
+                    stats["aspiration_fail_high"] += 1
+                    beta = (window_beta + window * (2 ** (attempt + 1))
+                            if attempt < max_aspiration_retries else float("inf"))
+                attempt += 1
+                stats["aspiration_retries"] += 1
+                if attempt > max_aspiration_retries:
+                    alpha, beta = -float("inf"), float("inf")
+                    use_window = False
 
         except SearchTimeout:
             stats["timed_out"] = True
             break
 
-        # Atomic publication: no result from a partial root iteration escapes.
-        if iteration_best_move is not None:
+        if iteration_complete and iteration_best_move is not None:
             best_move = iteration_best_move
             best_score = iteration_best_score
             best_line = iteration_best_line
