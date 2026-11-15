@@ -122,11 +122,31 @@ def test_kiwipete_legal_moves_match_python_chess_oracle():
         f"unexpected moves: {sorted(actual - expected)}"
     )
 
-def test_kiwipete_perft_castling_and_tactical_legality():
-    """Kiwipete reference counts exercise castling and complex legal move filtering."""
-    gs = load_fen_position(
-        "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1"
-    )
+def python_chess_perft(board, depth):
+    """Independent recursive perft implementation using python-chess."""
+    if depth == 0:
+        return 1
 
-    assert len(gs.get_valid_moves()) == 48
-    assert perft(gs, 2) == 2039
+    nodes = 0
+    for move in list(board.legal_moves):
+        board.push(move)
+        try:
+            nodes += python_chess_perft(board, depth - 1)
+        finally:
+            board.pop()
+    return nodes
+
+
+def test_complex_castling_position_matches_python_chess_perft():
+    """Compare legal move-tree counts with an independent chess-rules oracle."""
+    import chess
+
+    fen = (
+        "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/"
+        "2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1"
+    )
+    gs = load_fen_position(fen)
+    oracle = chess.Board(fen)
+
+    for depth in (1, 2, 3):
+        assert perft(gs, depth) == python_chess_perft(oracle, depth)
