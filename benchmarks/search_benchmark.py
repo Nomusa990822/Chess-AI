@@ -36,7 +36,7 @@ POSITIONS = (
 )
 
 
-def run_benchmark(depth, repeats, use_pvs=True):
+def run_benchmark(depth, repeats, search_mode="pvs"):
     results = []
     for name, fen in POSITIONS:
         samples = []
@@ -48,7 +48,7 @@ def run_benchmark(depth, repeats, use_pvs=True):
             started = time.perf_counter()
             move, info = choose_ai_move(
                 state, legal_moves, mode="fair", max_depth=depth,
-                time_budget=120.0, use_pvs=use_pvs,
+                time_budget=120.0, use_pvs=search_mode != "full-window",\n                use_aspiration=search_mode == "pvs-aspiration",
             )
             elapsed = time.perf_counter() - started
             if info["depth_reached"] != depth:
@@ -68,7 +68,7 @@ def run_benchmark(depth, repeats, use_pvs=True):
                 "pvs_null_window_searches": info["pvs_null_window_searches"],
                 "pvs_researches": info["pvs_researches"],
                 "root_pvs_null_window_searches": info["root_pvs_null_window_searches"],
-                "root_pvs_researches": info["root_pvs_researches"],
+                "root_pvs_researches": info["root_pvs_researches"],\n                "aspiration_searches": info["aspiration_searches"],\n                "aspiration_retries": info["aspiration_retries"],\n                "aspiration_fail_low": info["aspiration_fail_low"],\n                "aspiration_fail_high": info["aspiration_fail_high"],
                 "nodes_per_second": info["nodes"] / elapsed if elapsed else 0.0,
             })
             last_info = info
@@ -92,7 +92,7 @@ def run_benchmark(depth, repeats, use_pvs=True):
             "median_pvs_null_window_searches": statistics.median(s["pvs_null_window_searches"] for s in samples),
             "median_pvs_researches": statistics.median(s["pvs_researches"] for s in samples),
             "median_root_pvs_null_window_searches": statistics.median(s["root_pvs_null_window_searches"] for s in samples),
-            "median_root_pvs_researches": statistics.median(s["root_pvs_researches"] for s in samples),
+            "median_root_pvs_researches": statistics.median(s["root_pvs_researches"] for s in samples),\n            "median_aspiration_searches": statistics.median(s["aspiration_searches"] for s in samples),\n            "median_aspiration_retries": statistics.median(s["aspiration_retries"] for s in samples),\n            "median_aspiration_fail_low": statistics.median(s["aspiration_fail_low"] for s in samples),\n            "median_aspiration_fail_high": statistics.median(s["aspiration_fail_high"] for s in samples),
             "samples": samples,
         })
     return results
@@ -102,17 +102,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--depth", type=int, default=3)
     parser.add_argument("--repeats", type=int, default=3)
-    parser.add_argument("--search-mode", choices=("pvs", "full-window"), default="pvs")
+    parser.add_argument("--search-mode", choices=("pvs", "full-window", "pvs-aspiration"), default="pvs")
     args = parser.parse_args()
     if args.depth < 1 or args.repeats < 1:
         parser.error("--depth and --repeats must both be positive")
     print(json.dumps({
-        "benchmark": "phase1-pvs-comparison",
+        "benchmark": "phase1-search-mode-comparison",
         "search_mode": args.search_mode,
         "measurement": "complete choose_ai_move call, including explanation",
         "depth": args.depth,
         "repeats": args.repeats,
-        "results": run_benchmark(args.depth, args.repeats, use_pvs=args.search_mode == "pvs"),
+        "results": run_benchmark(args.depth, args.repeats, search_mode=args.search_mode),
     }, indent=2))
 
 
