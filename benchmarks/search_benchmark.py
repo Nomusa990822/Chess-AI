@@ -48,7 +48,8 @@ def run_benchmark(depth, repeats, search_mode="pvs"):
             started = time.perf_counter()
             move, info = choose_ai_move(
                 state, legal_moves, mode="fair", max_depth=depth,
-                time_budget=120.0, use_pvs=search_mode != "full-window",\n                use_aspiration=search_mode == "pvs-aspiration",
+                time_budget=120.0, use_pvs=search_mode != "full-window",
+                use_aspiration=search_mode == "pvs-aspiration",
             )
             elapsed = time.perf_counter() - started
             if info["depth_reached"] != depth:
@@ -68,7 +69,11 @@ def run_benchmark(depth, repeats, search_mode="pvs"):
                 "pvs_null_window_searches": info["pvs_null_window_searches"],
                 "pvs_researches": info["pvs_researches"],
                 "root_pvs_null_window_searches": info["root_pvs_null_window_searches"],
-                "root_pvs_researches": info["root_pvs_researches"],\n                "aspiration_searches": info["aspiration_searches"],\n                "aspiration_retries": info["aspiration_retries"],\n                "aspiration_fail_low": info["aspiration_fail_low"],\n                "aspiration_fail_high": info["aspiration_fail_high"],
+                "root_pvs_researches": info["root_pvs_researches"],
+                "aspiration_searches": info["aspiration_searches"],
+                "aspiration_retries": info["aspiration_retries"],
+                "aspiration_fail_low": info["aspiration_fail_low"],
+                "aspiration_fail_high": info["aspiration_fail_high"],
                 "nodes_per_second": info["nodes"] / elapsed if elapsed else 0.0,
             })
             last_info = info
@@ -92,7 +97,11 @@ def run_benchmark(depth, repeats, search_mode="pvs"):
             "median_pvs_null_window_searches": statistics.median(s["pvs_null_window_searches"] for s in samples),
             "median_pvs_researches": statistics.median(s["pvs_researches"] for s in samples),
             "median_root_pvs_null_window_searches": statistics.median(s["root_pvs_null_window_searches"] for s in samples),
-            "median_root_pvs_researches": statistics.median(s["root_pvs_researches"] for s in samples),\n            "median_aspiration_searches": statistics.median(s["aspiration_searches"] for s in samples),\n            "median_aspiration_retries": statistics.median(s["aspiration_retries"] for s in samples),\n            "median_aspiration_fail_low": statistics.median(s["aspiration_fail_low"] for s in samples),\n            "median_aspiration_fail_high": statistics.median(s["aspiration_fail_high"] for s in samples),
+            "median_root_pvs_researches": statistics.median(s["root_pvs_researches"] for s in samples),
+            "median_aspiration_searches": statistics.median(s["aspiration_searches"] for s in samples),
+            "median_aspiration_retries": statistics.median(s["aspiration_retries"] for s in samples),
+            "median_aspiration_fail_low": statistics.median(s["aspiration_fail_low"] for s in samples),
+            "median_aspiration_fail_high": statistics.median(s["aspiration_fail_high"] for s in samples),
             "samples": samples,
         })
     return results
