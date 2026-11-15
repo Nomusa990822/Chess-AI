@@ -155,3 +155,44 @@ def test_transposition_key_restores_after_make_undo():
     assert ai._transposition_key(gs) != original_key
     gs.undo_move()
     assert ai._transposition_key(gs) == original_key
+
+
+def test_transposition_table_keeps_deeper_entry():
+    table = {}
+    shallow = ai.TranspositionEntry(2, 1.0, "EXACT", None, [])
+    deep = ai.TranspositionEntry(5, 2.0, "LOWERBOUND", None, [])
+    ai._store_tt_entry(table, "position", deep)
+    ai._store_tt_entry(table, "position", shallow)
+    assert table["position"] is deep
+
+
+def test_transposition_table_prefers_exact_at_equal_depth():
+    table = {}
+    bound = ai.TranspositionEntry(4, 1.0, "LOWERBOUND", None, [])
+    exact = ai.TranspositionEntry(4, 2.0, "EXACT", None, [])
+    ai._store_tt_entry(table, "position", bound)
+    ai._store_tt_entry(table, "position", exact)
+    assert table["position"] is exact
+
+
+def test_quiet_cutoff_move_is_promoted_by_killer_ordering():
+    gs = GameState()
+    quiet_moves = [move for move in gs.get_valid_moves()
+                   if not ai.is_tactical_move(move)]
+    assert len(quiet_moves) >= 2
+    preferred = quiet_moves[-1]
+    stats = {"killer_moves": {}, "history_scores": {}}
+    ai._record_quiet_cutoff(gs, preferred, depth=3, ply=2, stats=stats)
+    ordered = ai.order_moves(gs, quiet_moves, ply=2, stats=stats)
+    assert ordered[0] == preferred
+    assert stats["history_scores"][ai._quiet_history_key(gs, preferred)] == 9
+
+
+def test_killer_history_state_does_not_mutate_game_position():
+    gs = GameState()
+    before = state_snapshot(gs)
+    move = next(m for m in gs.get_valid_moves() if not ai.is_tactical_move(m))
+    stats = {}
+    ai._record_quiet_cutoff(gs, move, depth=2, ply=1, stats=stats)
+    ai.order_moves(gs, gs.get_valid_moves(), ply=1, stats=stats)
+    assert state_snapshot(gs) == before
