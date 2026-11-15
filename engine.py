@@ -319,7 +319,9 @@ class GameState:
         enemy_color = "w" if attacking_white else "b"
         ally_color = "b" if attacking_white else "w"
 
-        # To inspect attacks on (row, col), locate enemy pawns one rank\n        # behind that square relative to their forward movement.\n        pawn_dir = 1 if enemy_color == "w" else -1
+        # To inspect attacks on (row, col), locate enemy pawns one rank
+        # behind that square relative to their forward movement.
+        pawn_dir = 1 if enemy_color == "w" else -1
         for dc in (-1, 1):
             r = row + pawn_dir
             c = col + dc
