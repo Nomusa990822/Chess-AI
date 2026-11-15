@@ -167,7 +167,7 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
                 _check_deadline(deadline)
                 gs.make_move(move)
                 try:
-                    if use_pvs and iteration_scores:
+                    if use_pvs and iteration_scores and ((not gs.white_to_move and alpha != -float("inf")) or (gs.white_to_move and beta != float("inf"))):
                         stats["root_pvs_null_window_searches"] += 1
                         if gs.white_to_move:
                             score, child_pv = minimax(
@@ -283,7 +283,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
             _check_deadline(deadline)
             gs.make_move(move)
             try:
-                if use_pvs and move_index > 0:
+                if use_pvs and move_index > 0 and alpha != -float("inf"):
                     stats["pvs_null_window_searches"] = stats.get("pvs_null_window_searches", 0) + 1
                     score, child_pv = minimax(
                         gs, depth - 1, alpha, min(beta, alpha + PVS_WINDOW),
@@ -316,7 +316,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
             _check_deadline(deadline)
             gs.make_move(move)
             try:
-                if use_pvs and move_index > 0:
+                if use_pvs and move_index > 0 and beta != float("inf"):
                     stats["pvs_null_window_searches"] = stats.get("pvs_null_window_searches", 0) + 1
                     score, child_pv = minimax(
                         gs, depth - 1, max(alpha, beta - PVS_WINDOW), beta,
