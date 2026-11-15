@@ -126,7 +126,7 @@ def _terminal_score(gs, ply):
     return None
 
 
-def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
+def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=True):
     """Return (best_move, search_info); only fully completed depths are published."""
     started = time.monotonic()
     deadline = started + max(0.0, time_budget)
@@ -168,7 +168,7 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
                 try:
                     score, child_pv = minimax(
                         gs, depth - 1, alpha, beta, gs.white_to_move,
-                        mode, tt, stats, deadline, ply=1
+                        mode, tt, stats, deadline, ply=1, use_pvs=use_pvs
                     )
                 finally:
                     gs.undo_move()
