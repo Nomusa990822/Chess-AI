@@ -390,3 +390,54 @@ from recursive PVS counters, allowing future comparisons to distinguish root
 search activity from recursive search activity. This section's final recorded
 counts and measurements are refreshed by the CI run triggered by this
 documentation update.
+
+
+### Final paired measurements with root-PVS instrumentation
+
+Workflow
+[43777094177](https://github.com/Nomusa990822/Chess-AI/actions/runs/43777094177)
+passed on the final root-PVS documentation commit
+`fecedd776be8f97675c2c782658a6d9533a66d90`. Application compilation passed,
+all 102 tests passed in 38.70 seconds, and the benchmark completed both
+search modes at depth two (two repetitions) and depth three (one repetition)
+for all three fixed positions.
+
+Depth-two median end-to-end time and node counts:
+
+| Position | Full-window time (s) | PVS time (s) | Full-window nodes | PVS nodes |
+|---|---:|---:|---:|---:|
+| Opening | 0.4136 | 0.5603 | 193 | 273 |
+| Middlegame | 2.9940 | 2.6843 | 174 | 174 |
+| Endgame | 0.0742 | 0.0835 | 58 | 72 |
+
+Depth-three end-to-end time and node counts (one sample):
+
+| Position | Full-window time (s) | PVS time (s) | Full-window nodes | PVS nodes |
+|---|---:|---:|---:|---:|
+| Opening | 1.9374 | 2.2454 | 847 | 1048 |
+| Middlegame | 13.8824 | 12.8859 | 2034 | 1990 |
+| Endgame | 0.2450 | 0.2199 | 249 | 231 |
+
+Both modes selected the same moves and returned the same scores in every
+paired position: b1c3, e2a6, f3e4 at depth two; b1c3, e2a6, d4d5 at depth
+three. At depth two, PVS was slower in the opening and endgame but faster in
+the middlegame. At depth three, PVS was slower in the opening and faster in
+the middlegame and endgame. These small, environment-sensitive samples do not
+justify changing the default search mode.
+
+The instrumented PVS counts (null-window searches / full-window re-searches)
+were:
+
+| Position | Depth | Recursive PVS | Root PVS |
+|---|---:|---:|---:|
+| Opening | 2 | 190 / 13 | 38 / 7 |
+| Middlegame | 2 | 39 / 0 | 88 / 0 |
+| Endgame | 2 | 39 / 3 | 16 / 2 |
+| Opening | 3 | 826 / 21 | 57 / 9 |
+| Middlegame | 3 | 1683 / 0 | 132 / 0 |
+| Endgame | 3 | 138 / 4 | 24 / 2 |
+
+Root PVS is therefore implemented, tested, and measurable, but remains an
+experimental opt-in. Full-window alpha-beta remains the default because
+performance is position-dependent and no broad, repeatable advantage has
+been demonstrated.
