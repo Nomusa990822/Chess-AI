@@ -82,8 +82,14 @@ def load_fen_position(fen):
         "K" in rights, "Q" in rights, "k" in rights, "q" in rights
     )
     gs.castle_rights_log = [gs.current_castling_rights.copy()]
-    gs.en_passant_possible = ()
-    gs.en_passant_possible_log = [()]
+    ep_square = fields[3]
+    if ep_square == "-":
+        gs.en_passant_possible = ()
+    else:
+        files = "abcdefgh"
+        ranks = "87654321"
+        gs.en_passant_possible = (ranks.index(ep_square[1]), files.index(ep_square[0]))
+    gs.en_passant_possible_log = [gs.en_passant_possible]
     for row in range(8):
         for col in range(8):
             if gs.board[row][col] == "wK":
@@ -150,3 +156,51 @@ def test_complex_castling_position_matches_python_chess_perft():
 
     for depth in (1, 2, 3):
         assert perft(gs, depth) == python_chess_perft(oracle, depth)
+
+
+
+def test_castling_requires_original_rook_even_when_right_is_set():
+    """Stale castling flags must not create a castle when the rook is absent."""
+    import chess
+
+    fen = "4k3/8/8/8/8/8/8/4K3 w KQ - 0 1"
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+    assert "e1g1" not in actual and "e1c1" not in actual
+
+
+def test_castling_requires_king_on_home_square():
+    """A displaced king cannot castle using stale castling rights."""
+    import chess
+
+    fen = "4k3/8/8/8/8/8/4K3/7R w K - 0 1"
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+
+
+def test_en_passant_that_exposes_own_king_is_rejected():
+    """En passant must be filtered when removing both pawns opens a rook line."""
+    import chess
+
+    fen = "k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1"
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+    assert "e5d6" not in actual
+
+
+def test_all_promotion_choices_match_python_chess():
+    """All four promotion choices must be represented in legal move generation."""
+    import chess
+
+    fen = "4k3/P7/8/8/8/8/8/4K3 w - - 0 1"
+    gs = load_fen_position(fen)
+    expected = {move.uci() for move in chess.Board(fen).legal_moves}
+    actual = {engine_move_uci(move) for move in gs.get_valid_moves()}
+    assert actual == expected
+    assert {move[-1] for move in actual if move.startswith("a7a8")} == set("qrbn")
