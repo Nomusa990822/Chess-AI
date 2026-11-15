@@ -126,7 +126,7 @@ def _terminal_score(gs, ply):
     return None
 
 
-def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=True):
+def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=False):
     """Return (best_move, search_info); only fully completed depths are published."""
     started = time.monotonic()
     deadline = started + max(0.0, time_budget)
