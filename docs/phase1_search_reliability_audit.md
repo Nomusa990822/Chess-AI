@@ -155,3 +155,20 @@ position live.
 
 This is a bounded deterministic sample, not exhaustive proof over all legal
 games or a full formal verification of repetition adjudication.
+
+
+## Transposition-table draw-context validation
+
+Transposition-table entries are now keyed by the ordinary position identity,
+the exact halfmove clock, and a sorted snapshot of the complete repetition
+position-count map. This prevents positions with identical boards but different
+50/75-move counters or prior repetition histories from sharing cached scores.
+The full count map is retained rather than only currently repeated positions:
+a position seen once earlier in the game can become a repetition later in a
+search line. The trade-off is reduced cache reuse across different game
+histories and additional key memory/construction cost. This is a correctness-
+first implementation; its performance impact remains to be benchmarked.
+
+Regression tests assert that equal board identities with different halfmove
+clocks or repetition histories receive distinct cache keys, and that make/undo
+restores the original cache identity.
