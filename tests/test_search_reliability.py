@@ -234,7 +234,7 @@ def test_pvs_matches_full_window_minimax_and_restores_state(black_to_move):
     "8/5pk1/6p1/8/3P4/5K2/8/8 w - - 0 1",
 ])
 def test_pvs_matches_full_window_and_returns_legal_principal_variation(fen):
-    from tests.test_perft import engine_move_uci, load_fen_position
+    from tests.test_perft import load_fen_position
 
     gs = load_fen_position(fen)
     before = state_snapshot(gs)
@@ -259,9 +259,9 @@ def test_pvs_matches_full_window_and_returns_legal_principal_variation(fen):
 
     # Replay every reported PV move against the live legal-move generator.
     for uci in pv:
-        legal_by_uci = {engine_move_uci(move): move for move in gs.get_valid_moves()}
-        assert uci in legal_by_uci, f"PVS returned illegal PV move {uci} in {fen}"
-        gs.make_move(legal_by_uci[uci])
+        legal_by_notation = {move.get_chess_notation(): move for move in gs.get_valid_moves()}
+        assert uci in legal_by_notation, f"PVS returned illegal PV move {uci} in {fen}"
+        gs.make_move(legal_by_notation[uci])
 
     assert state_snapshot(gs) != before  # The PV was actually replayed.
     while gs.move_log:
