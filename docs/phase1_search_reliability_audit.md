@@ -89,3 +89,10 @@ python-chess oracle comparisons cover stale castling rights with a missing rook,
 a displaced king, an en-passant capture that would expose its own king to a rook,
 and all four promotion choices. These are targeted special-move regressions;
 they do not by themselves establish complete FIDE-rule coverage.
+
+
+The promotion oracle exposed a genuine legal-move-generation defect: the engine
+generated only queen promotions, while standard chess permits queen, rook,
+bishop, and knight promotions. Pawn move generation now emits all four choices
+for both quiet promotions and promotion captures. The failing oracle test remains
+in the suite to prevent regression.
