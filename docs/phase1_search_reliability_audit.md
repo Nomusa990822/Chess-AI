@@ -110,3 +110,16 @@ a complete standard perft suite or a full audit of all draw rules.
 ## Repetition identity and fifty-move counter update
 
 Position identity now ignores an en-passant target unless the side to move has a legal en-passant capture, including king-safety constraints. The game state tracks the halfmove clock, resets it after pawn moves and captures, restores it on undo, and exposes the 100-halfmove draw threshold. Search scores that draw as zero. The 75-move automatic-draw rule and insufficient-material detection remain outside this batch.
+
+
+## Automatic draw and insufficient-material update
+
+The engine now tracks fivefold repetition and the 75-move automatic-draw threshold
+(150 halfmoves), alongside its existing threefold and 50-move claim handling.
+Search returns a terminal draw score for these states. The material detector is
+intentionally conservative: it recognises king-versus-king, a lone bishop or
+knight against a bare king, and bishop-only positions where all bishops occupy
+the same square colour. It does not claim that all other minor-piece endings are
+dead positions. Regression tests cover these recognised cases and a rook-positive
+control. The halfmove clock and its history are now included in perft state
+restoration snapshots.
