@@ -8,7 +8,13 @@ and transposition table. It is a comparative microbenchmark, not an Elo test.
 import argparse
 import json
 import statistics
+import sys
 import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from ai import choose_ai_move
 from tests.test_perft import load_fen_position, engine_move_uci
