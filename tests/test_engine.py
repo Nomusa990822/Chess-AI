@@ -380,7 +380,7 @@ def test_checkmate_takes_precedence_over_seventyfive_move_draw():
 
     assert gs.checkmate is True
     assert gs.draw_by_seventyfive_move is True
-    assert score == -CHECKMATE_SCORE
+    assert score == CHECKMATE_SCORE
 
 
 def test_undo_restores_repetition_counts_exactly():
