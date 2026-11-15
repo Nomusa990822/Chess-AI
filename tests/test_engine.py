@@ -225,23 +225,13 @@ def test_kingside_castle_move_is_generated():
 
 
 def test_draw_by_repetition_flag():
-    """
-    Repeating the same position three times should trigger repetition draw.
-    """
+    """Three occurrences of a genuinely repeated legal position are detected."""
     gs = GameState()
-
-    # Repeat a knight shuffle
-    move1 = Move((7, 6), (5, 5), gs.board)  # g1f3
-    move2 = Move((0, 6), (2, 5), gs.board)  # g8f6
-    move3 = Move((5, 5), (7, 6), gs.board)  # f3g1
-    move4 = Move((2, 5), (0, 6), gs.board)  # f6g8
-
-    for _ in range(3):
-        gs.make_move(move1)
-        gs.make_move(move2)
-        gs.make_move(move3)
-        gs.make_move(move4)
-
+    for _ in range(2):
+        gs.make_move(Move((7, 6), (5, 5), gs.board))  # g1f3
+        gs.make_move(Move((0, 6), (2, 5), gs.board))  # g8f6
+        gs.make_move(Move((5, 5), (7, 6), gs.board))  # f3g1
+        gs.make_move(Move((2, 5), (0, 6), gs.board))  # f6g8
     gs.update_game_status()
     assert gs.draw_by_repetition is True
 
