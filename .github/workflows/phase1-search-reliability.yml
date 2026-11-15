@@ -54,4 +54,6 @@ jobs:
         run: python -m pytest -v
 
       - name: Run fixed-position search benchmark
-        run: python benchmarks/search_benchmark.py --depth 2 --repeats 2
+        run: |
+          python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode full-window
+          python benchmarks/search_benchmark.py --depth 2 --repeats 2 --search-mode pvs
