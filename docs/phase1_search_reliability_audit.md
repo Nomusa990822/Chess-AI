@@ -74,3 +74,18 @@ defect. The test has been corrected to compare recursive perft counts at depths
 1–3 against python-chess for the exact FEN. This avoids asserting reference
 counts that do not belong to the tested position. The independent library is
 installed only in CI as a test oracle; it is not a runtime dependency.
+
+## Special-move oracle validation update
+
+A follow-up review found that castling generation trusted castling-rights flags
+without verifying that the king remained on its original square or that the
+corresponding rook remained on its original corner. This could generate
+impossible castling moves in custom positions with stale rights. The generator
+now requires the king and rook to occupy their original squares before
+considering path and attack constraints.
+
+The perft FEN test helper now preserves the en-passant target square. New
+python-chess oracle comparisons cover stale castling rights with a missing rook,
+a displaced king, an en-passant capture that would expose its own king to a rook,
+and all four promotion choices. These are targeted special-move regressions;
+they do not by themselves establish complete FIDE-rule coverage.
