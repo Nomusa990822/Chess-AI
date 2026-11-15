@@ -67,6 +67,8 @@ def run_benchmark(depth, repeats, use_pvs=True):
                 "tt_hits": info["tt_hits"],
                 "pvs_null_window_searches": info["pvs_null_window_searches"],
                 "pvs_researches": info["pvs_researches"],
+                "root_pvs_null_window_searches": info["root_pvs_null_window_searches"],
+                "root_pvs_researches": info["root_pvs_researches"],
                 "nodes_per_second": info["nodes"] / elapsed if elapsed else 0.0,
             })
             last_info = info
@@ -89,6 +91,8 @@ def run_benchmark(depth, repeats, use_pvs=True):
             "median_tt_hits": statistics.median(s["tt_hits"] for s in samples),
             "median_pvs_null_window_searches": statistics.median(s["pvs_null_window_searches"] for s in samples),
             "median_pvs_researches": statistics.median(s["pvs_researches"] for s in samples),
+            "median_root_pvs_null_window_searches": statistics.median(s["root_pvs_null_window_searches"] for s in samples),
+            "median_root_pvs_researches": statistics.median(s["root_pvs_researches"] for s in samples),
             "samples": samples,
         })
     return results
