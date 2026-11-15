@@ -74,7 +74,7 @@ def _terminal_score(gs, ply):
     if gs.checkmate:
         # The side to move has been checkmated.
         return -CHECKMATE_SCORE + ply if gs.white_to_move else CHECKMATE_SCORE - ply
-    if gs.stalemate or gs.draw_by_repetition:
+    if gs.stalemate or gs.draw_by_repetition or gs.draw_by_fifty_move:
         return 0.0
     return None
 
