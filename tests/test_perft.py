@@ -56,3 +56,50 @@ def test_perft_restores_complete_game_state():
     perft(gs, 3)
 
     assert state_snapshot(gs) == before
+
+
+def load_fen_position(fen):
+    """Load the board fields needed by perft fixtures without a runtime FEN dependency."""
+    from engine import CastleRights
+
+    gs = GameState()
+    fields = fen.split()
+    rows = []
+    for fen_row in fields[0].split("/"):
+        row = []
+        for symbol in fen_row:
+            if symbol.isdigit():
+                row.extend(["--"] * int(symbol))
+            else:
+                color = "w" if symbol.isupper() else "b"
+                row.append(color + symbol.upper())
+        rows.append(row)
+
+    gs.board = rows
+    gs.white_to_move = fields[1] == "w"
+    rights = fields[2]
+    gs.current_castling_rights = CastleRights(
+        "K" in rights, "Q" in rights, "k" in rights, "q" in rights
+    )
+    gs.castle_rights_log = [gs.current_castling_rights.copy()]
+    gs.en_passant_possible = ()
+    gs.en_passant_possible_log = [()]
+    for row in range(8):
+        for col in range(8):
+            if gs.board[row][col] == "wK":
+                gs.white_king_location = (row, col)
+            elif gs.board[row][col] == "bK":
+                gs.black_king_location = (row, col)
+    gs.position_counts = {}
+    gs.record_current_position()
+    return gs
+
+
+def test_kiwipete_perft_castling_and_tactical_legality():
+    """Kiwipete reference counts exercise castling and complex legal move filtering."""
+    gs = load_fen_position(
+        "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1"
+    )
+
+    assert perft(gs, 1) == 48
+    assert perft(gs, 2) == 2039
