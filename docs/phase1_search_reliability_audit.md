@@ -214,3 +214,26 @@ were already present when this benchmark was introduced. Compare PVS against
 this same benchmark, on the same runner class and parameters, and report the
 raw per-position results as well as aggregate medians. Runtime measurements
 are environment-sensitive and do not establish playing strength or Elo.
+
+### CI reference measurements (Python 3.12, GitHub-hosted Ubuntu)
+
+The benchmark completed successfully in workflow run
+[43775396834](https://github.com/Nomusa990822/Chess-AI/actions/runs/43775396834)
+at depth two with two repetitions per position. The median measurements were:
+
+| Position | Median elapsed (s) | Median nodes | Median q-nodes | Median NPS | Median prunes |
+|---|---:|---:|---:|---:|---:|
+| Opening | 0.2254 | 193 | 183 | 856.3 | 21 |
+| Middlegame | 1.6838 | 174 | 987 | 103.3 | 237 |
+| Endgame | 0.0409 | 58 | 69 | 1417.0 | 7 |
+
+Both repetitions completed the requested depth and selected a legal move in
+all three positions. The observed moves in the final repetition were b1c3,
+e2a6, and f3e4 respectively. These are measurements from one CI run, not
+universal performance guarantees. The middlegame's larger quiescence workload
+is visible in its 987 median q-nodes and lower end-to-end NPS.
+
+The complete test suite also passed in that workflow: 92 tests passed. The
+benchmark's first CI attempt exposed a script import-path issue; the script was
+corrected to add the repository root to `sys.path`, and the subsequent full
+workflow passed, including all benchmark positions.
