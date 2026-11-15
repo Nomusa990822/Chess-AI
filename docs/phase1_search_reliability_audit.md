@@ -105,3 +105,8 @@ castling through an attacked transit square, and Black's four promotion choices.
 Separate terminal fixtures assert that the engine distinguishes checkmate from
 stalemate. These tests extend targeted coverage; they are not a substitute for
 a complete standard perft suite or a full audit of all draw rules.
+
+
+## Repetition identity and fifty-move counter update
+
+Position identity now ignores an en-passant target unless the side to move has a legal en-passant capture, including king-safety constraints. The game state tracks the halfmove clock, resets it after pawn moves and captures, restores it on undo, and exposes the 100-halfmove draw threshold. Search scores that draw as zero. The 75-move automatic-draw rule and insufficient-material detection remain outside this batch.
