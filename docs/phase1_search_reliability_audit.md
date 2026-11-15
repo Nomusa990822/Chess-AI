@@ -345,3 +345,48 @@ repeatable improvement, so PVS remains an experimental opt-in and the
 full-window search remains the default. A single depth-three sample is
 informative but not statistically robust; repeated measurements on multiple
 runner instances would be needed before changing the default.
+
+
+## Root-level Principal Variation Search
+
+Root move selection now applies the same PVS principle as recursive nodes.
+The first ordered root move is searched with the full current window. Later
+moves are searched with a null window on the correct side of the incumbent
+bound, and any result that improves the incumbent without proving a cutoff is
+re-searched with the full window. Root null-window searches and root
+re-searches have separate counters in the search statistics and benchmark
+output.
+
+The root-window direction is derived from the side to move after the candidate
+root move has been made: after a White root move, Black is to move and the
+child is searched with the narrow alpha window; after a Black root move, White
+is to move and the child is searched with the narrow beta window. PVS now
+avoids constructing a null window from an infinite bound. When the relevant
+bound is still infinite, that node uses a full-window search instead. This
+guard is important because an invalid `[-inf, -inf]` or `[inf, inf]` window
+can otherwise propagate infinite scores into root selection.
+
+Three fixed-position root tests compare the selected move and final score
+against full-window search at depth two, including White-to-move opening and
+endgame positions and a Black-to-move middlegame. The test suite also retains
+recursive PVS score-equivalence, legal-PV replay, timeout, and state-restoration
+coverage.
+
+Workflow
+[43776898988](https://github.com/Nomusa990822/Chess-AI/actions/runs/43776898988)
+passed on commit
+[22feab9a5daa982b5776a553515777ea79e5c351](https://github.com/Nomusa990822/Chess-AI/commit/22feab9a5daa982b5776a553515777ea79e5c351):
+application compilation passed and all 102 tests passed in 39.24 seconds.
+Both search modes completed the fixed-position benchmark at depths two and
+three. The results remained mixed: PVS improved the middlegame timings at both
+depths, while the opening was slower at both depths; the endgame was slower at
+depth two but faster at depth three. PVS also searched more nodes in the
+opening and endgame, while its middlegame node count was similar or slightly
+lower. These results still do not establish a general speedup, so PVS remains
+opt-in and full-window alpha-beta remains the default.
+
+The benchmark now reports root PVS null-window and re-search counts separately
+from recursive PVS counters, allowing future comparisons to distinguish root
+search activity from recursive search activity. This section's final recorded
+counts and measurements are refreshed by the CI run triggered by this
+documentation update.
