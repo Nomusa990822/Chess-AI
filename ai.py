@@ -49,15 +49,53 @@ def move_priority_hint(gs, move):
     return score
 
 
-def order_moves(gs, moves, tt_move=None):
+def _quiet_history_key(gs, move):
+    return (gs.white_to_move, move.piece_moved, move.start_row,
+            move.start_col, move.end_row, move.end_col)
+
+
+def order_moves(gs, moves, tt_move=None, ply=0, stats=None):
+    """Order hash move, tactical moves, killers, then history-scored quiets."""
+    stats = stats if stats is not None else {}
+    killers = stats.setdefault("killer_moves", {})
+    history = stats.setdefault("history_scores", {})
+    ply_killers = killers.get(ply, ())
     scored = []
     for move in moves:
         score = move_priority_hint(gs, move)
         if tt_move is not None and move == tt_move:
-            score += 100
+            score += 1000000
+        elif is_tactical_move(move):
+            score += 10000
+        else:
+            notation = move.get_chess_notation()
+            if notation in ply_killers:
+                score += 5000 - ply_killers.index(notation) * 100
+            score += history.get(_quiet_history_key(gs, move), 0)
         scored.append((score, move))
     scored.sort(key=lambda item: item[0], reverse=True)
     return [move for _, move in scored]
+
+
+def _record_quiet_cutoff(gs, move, depth, ply, stats):
+    if is_tactical_move(move):
+        return
+    killers = stats.setdefault("killer_moves", {})
+    notation = move.get_chess_notation()
+    current = [item for item in killers.get(ply, ()) if item != notation]
+    killers[ply] = (notation, *current[:1])
+    history = stats.setdefault("history_scores", {})
+    key = _quiet_history_key(gs, move)
+    history[key] = min(1000000, history.get(key, 0) + depth * depth)
+
+
+def _store_tt_entry(tt, key, entry):
+    """Prefer deeper results; at equal depth prefer exact over bound entries."""
+    previous = tt.get(key)
+    if (previous is None or entry.depth > previous.depth
+            or (entry.depth == previous.depth
+                and entry.flag == "EXACT" and previous.flag != "EXACT")):
+        tt[key] = entry
 
 
 def is_tactical_move(move):
@@ -97,7 +135,7 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
         "score": 0.0, "depth_reached": 0, "explanation": "",
         "top_lines": [], "principal_variation": [],
         "phase": get_game_phase(gs.board), "timed_out": False,
-        "completed_iterations": []
+        "completed_iterations": [], "killer_moves": {}, "history_scores": {}
     }
 
     best_move = valid_moves[0] if valid_moves else None
@@ -108,7 +146,8 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
         root_key = _transposition_key(gs)
         root_entry = tt.get(root_key)
         root_moves = order_moves(gs, valid_moves,
-                                 root_entry.best_move if root_entry else None)
+                                 root_entry.best_move if root_entry else None,
+                                 ply=0, stats=stats)
         if not root_moves:
             best_move = None
             break
@@ -211,7 +250,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
         return (terminal if terminal is not None else evaluate_position(gs, mode)), []
 
     tt_move = entry.best_move if entry else None
-    moves = order_moves(gs, moves, tt_move)
+    moves = order_moves(gs, moves, tt_move, ply=ply, stats=stats)
     best_move, best_pv = None, []
 
     if maximizing_player:
@@ -229,6 +268,7 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
                 best_pv = [move.get_chess_notation()] + child_pv
             alpha = max(alpha, best_score)
             if alpha >= beta:
+                _record_quiet_cutoff(gs, move, depth, ply, stats)
                 stats["prunes"] += 1
                 break
     else:
@@ -254,7 +294,9 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
         flag = "UPPERBOUND"
     elif best_score >= original_beta:
         flag = "LOWERBOUND"
-    tt[key] = TranspositionEntry(depth, best_score, flag, best_move, best_pv)
+    _store_tt_entry(
+        tt, key, TranspositionEntry(depth, best_score, flag, best_move, best_pv)
+    )
     return best_score, best_pv
 
 
