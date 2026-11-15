@@ -96,3 +96,12 @@ generated only queen promotions, while standard chess permits queen, rook,
 bishop, and knight promotions. Pawn move generation now emits all four choices
 for both quiet promotions and promotion captures. The failing oracle test remains
 in the suite to prevent regression.
+
+
+## Terminal-position and side-to-move validation update
+
+Additional oracle-backed cases now cover a complex position with Black to move,
+castling through an attacked transit square, and Black's four promotion choices.
+Separate terminal fixtures assert that the engine distinguishes checkmate from
+stalemate. These tests extend targeted coverage; they are not a substitute for
+a complete standard perft suite or a full audit of all draw rules.
