@@ -333,12 +333,11 @@ class GameState:
             moving_piece = self.board[source_row][source_col]
             target_piece = self.board[target_row][target_col]
             self.board[source_row][source_col] = "--"
-            self.board[source_row][target_col] = moving_piece
-            self.board[source_row][target_col] = moving_piece
-            self.board[source_row][source_col] = "--"
+            self.board[source_row][target_col] = "--"
             self.board[target_row][target_col] = moving_piece
-            self.board[source_row][target_col] = captured_piece
-            safe = not self.square_under_attack(king[0], king[1], attacking_white=(color == "b"))
+            safe = not self.square_under_attack(
+                king[0], king[1], attacking_white=(color == "b")
+            )
             self.board[source_row][source_col] = moving_piece
             self.board[source_row][target_col] = captured_piece
             self.board[target_row][target_col] = target_piece
