@@ -371,7 +371,7 @@ def test_insufficient_material_single_bishop_or_knight():
 
 
 def test_insufficient_material_same_colour_bishops_only():
-    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/2B1KB2 w - - 0 1")
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/B1B1K3 w - - 0 1")
     assert gs.is_insufficient_material()
 
 
