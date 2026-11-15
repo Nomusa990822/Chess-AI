@@ -432,10 +432,23 @@ class GameState:
                     self.move_functions[piece[1]](row, col, moves)
         return moves
 
+    def _append_pawn_move(self, start, end, moves, is_en_passant_move=False):
+        """Append every legal promotion choice when a pawn reaches its last rank."""
+        start_row, _ = start
+        end_row, _ = end
+        promotes = (self.board[start_row][start[1]] == "wP" and end_row == 0) or (
+            self.board[start_row][start[1]] == "bP" and end_row == 7
+        )
+        choices = ("Q", "R", "B", "N") if promotes else ("Q",)
+        for choice in choices:
+            moves.append(Move(start, end, self.board,
+                              is_en_passant_move=is_en_passant_move,
+                              promotion_choice=choice))
+
     def get_pawn_moves(self, row, col, moves):
         if self.white_to_move:
             if row - 1 >= 0 and self.board[row - 1][col] == "--":
-                moves.append(Move((row, col), (row - 1, col), self.board))
+                self._append_pawn_move((row, col), (row - 1, col), moves)
                 if row == 6 and self.board[row - 2][col] == "--":
                     moves.append(Move((row, col), (row - 2, col), self.board))
 
@@ -444,12 +457,12 @@ class GameState:
                 if 0 <= c < 8 and row - 1 >= 0:
                     end_piece = self.board[row - 1][c]
                     if end_piece.startswith("b"):
-                        moves.append(Move((row, col), (row - 1, c), self.board))
+                        self._append_pawn_move((row, col), (row - 1, c), moves)
                     if (row - 1, c) == self.en_passant_possible:
                         moves.append(Move((row, col), (row - 1, c), self.board, is_en_passant_move=True))
         else:
             if row + 1 < 8 and self.board[row + 1][col] == "--":
-                moves.append(Move((row, col), (row + 1, col), self.board))
+                self._append_pawn_move((row, col), (row + 1, col), moves)
                 if row == 1 and self.board[row + 2][col] == "--":
                     moves.append(Move((row, col), (row + 2, col), self.board))
 
@@ -458,7 +471,7 @@ class GameState:
                 if 0 <= c < 8 and row + 1 < 8:
                     end_piece = self.board[row + 1][c]
                     if end_piece.startswith("w"):
-                        moves.append(Move((row, col), (row + 1, c), self.board))
+                        self._append_pawn_move((row, col), (row + 1, c), moves)
                     if (row + 1, c) == self.en_passant_possible:
                         moves.append(Move((row, col), (row + 1, c), self.board, is_en_passant_move=True))
 
