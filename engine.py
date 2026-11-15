@@ -137,6 +137,9 @@ class GameState:
         self.checkmate = False
         self.stalemate = False
         self.draw_by_repetition = False
+        self.draw_by_fifty_move = False
+        self.halfmove_clock = 0
+        self.halfmove_clock_log = [0]
 
         self.en_passant_possible = ()
         self.en_passant_possible_log = [self.en_passant_possible]
@@ -159,7 +162,7 @@ class GameState:
             f"{int(self.current_castling_rights.bks)}"
             f"{int(self.current_castling_rights.bqs)}"
         )
-        ep = str(self.en_passant_possible)
+        ep = str(self.en_passant_possible if self.has_legal_en_passant() else ())
         return f"{board_str}|{side}|{rights}|{ep}"
 
     def record_current_position(self):
@@ -198,6 +201,12 @@ class GameState:
             self.en_passant_possible = ()
 
         self.en_passant_possible_log.append(self.en_passant_possible)
+
+        if move.piece_moved[1] == "P" or move.piece_captured != "--":
+            self.halfmove_clock = 0
+        else:
+            self.halfmove_clock += 1
+        self.halfmove_clock_log.append(self.halfmove_clock)
 
         if move.is_castle_move:
             if move.end_col - move.start_col == 2:
@@ -240,6 +249,9 @@ class GameState:
         self.en_passant_possible_log.pop()
         self.en_passant_possible = self.en_passant_possible_log[-1]
 
+        self.halfmove_clock_log.pop()
+        self.halfmove_clock = self.halfmove_clock_log[-1]
+
         self.castle_rights_log.pop()
         self.current_castling_rights = self.castle_rights_log[-1].copy()
 
@@ -254,6 +266,7 @@ class GameState:
         self.checkmate = False
         self.stalemate = False
         self.draw_by_repetition = False
+        self.draw_by_fifty_move = False
 
     def update_castle_rights(self, move):
         """
@@ -301,6 +314,37 @@ class GameState:
         _ = self.get_valid_moves()
         key = self.get_position_key()
         self.draw_by_repetition = self.position_counts.get(key, 0) >= 3
+        self.draw_by_fifty_move = self.halfmove_clock >= 100
+
+    def has_legal_en_passant(self):
+        """Return True only when a legal en-passant capture exists."""
+        if not self.en_passant_possible:
+            return False
+        target_row, target_col = self.en_passant_possible
+        color = "w" if self.white_to_move else "b"
+        source_row = target_row + (1 if color == "w" else -1)
+        captured_piece = "bP" if color == "w" else "wP"
+        if not (0 <= source_row < 8) or self.board[source_row][target_col] != captured_piece:
+            return False
+        king = self.white_king_location if color == "w" else self.black_king_location
+        for source_col in (target_col - 1, target_col + 1):
+            if not 0 <= source_col < 8 or self.board[source_row][source_col] != color + "P":
+                continue
+            moving_piece = self.board[source_row][source_col]
+            target_piece = self.board[target_row][target_col]
+            self.board[source_row][source_col] = "--"
+            self.board[source_row][target_col] = moving_piece
+            self.board[source_row][target_col] = moving_piece
+            self.board[source_row][source_col] = "--"
+            self.board[target_row][target_col] = moving_piece
+            self.board[source_row][target_col] = captured_piece
+            safe = not self.square_under_attack(king[0], king[1], attacking_white=(color == "b"))
+            self.board[source_row][source_col] = moving_piece
+            self.board[source_row][target_col] = captured_piece
+            self.board[target_row][target_col] = target_piece
+            if safe:
+                return True
+        return False
 
     def in_check(self, white_side):
         """
