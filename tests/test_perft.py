@@ -90,6 +90,8 @@ def load_fen_position(fen):
         ranks = "87654321"
         gs.en_passant_possible = (ranks.index(ep_square[1]), files.index(ep_square[0]))
     gs.en_passant_possible_log = [gs.en_passant_possible]
+    gs.halfmove_clock = int(fields[4]) if len(fields) > 4 else 0
+    gs.halfmove_clock_log = [gs.halfmove_clock]
     for row in range(8):
         for col in range(8):
             if gs.board[row][col] == "wK":
