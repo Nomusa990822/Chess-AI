@@ -314,3 +314,34 @@ remains opt-in and full-window alpha-beta remains the default. The earlier
 statement that PVS was deferred describes the stage before this later opt-in
 experiment and is superseded by the implementation and verification sections
 above.
+
+
+### Deeper paired benchmark (depth three)
+
+The CI workflow now adds a one-repetition depth-three comparison after the
+two-repetition depth-two check. It also runs when documentation changes, so
+recorded benchmark evidence and the verification workflow stay connected.
+Workflow
+[43776212761](https://github.com/Nomusa990822/Chess-AI/actions/runs/43776212761)
+passed on commit
+[262d36a6b810f8e26622fb52de3272814469d04e](https://github.com/Nomusa990822/Chess-AI/commit/262d36a6b810f8e26622fb52de3272814469d04e):
+application compilation passed, all 99 tests passed in 13.86 seconds, and
+both benchmark modes completed depth two (two repetitions) and depth three
+(one repetition) on all three fixed positions.
+
+Depth-three end-to-end measurements (one sample per position, seconds):
+
+| Position | Full-window time | PVS time | Full-window nodes | PVS nodes | Full-window score | PVS score |
+|---|---:|---:|---:|---:|---:|---:|
+| Opening | 1.0190 | 1.0729 | 847 | 903 | 0.340 | 0.340 |
+| Middlegame | 7.3595 | 7.0198 | 2034 | 2074 | -0.119 | -0.119 |
+| Endgame | 0.1279 | 0.1532 | 249 | 303 | -0.900 | -0.900 |
+
+The selected moves also matched between modes (b1c3, e2a6, and d4d5). PVS
+was approximately 5.3% slower in the opening, 4.6% faster in the middlegame,
+and 19.7% slower in the endgame in this single-sample run. It searched more
+nodes in every position. This mixed result is insufficient to establish a
+repeatable improvement, so PVS remains an experimental opt-in and the
+full-window search remains the default. A single depth-three sample is
+informative but not statistically robust; repeated measurements on multiple
+runner instances would be needed before changing the default.
