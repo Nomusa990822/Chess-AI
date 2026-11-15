@@ -237,3 +237,42 @@ The complete test suite also passed in that workflow: 92 tests passed. The
 benchmark's first CI attempt exposed a script import-path issue; the script was
 corrected to add the repository root to `sys.path`, and the subsequent full
 workflow passed, including all benchmark positions.
+
+## Principal Variation Search experiment
+
+PVS is implemented as an opt-in search mode in `ai.py`. At each non-root
+alpha-beta node, the first ordered move receives the full window. Later moves
+are searched with a narrow window of `1e-6` in the appropriate direction.
+A move whose result improves the incumbent without already causing a cutoff
+is re-searched with the full window. Search timeout exceptions continue to
+propagate, and speculative board moves remain protected by `finally` undo
+blocks. Search statistics expose null-window search and full-window re-search
+counts. The `choose_ai_move` API accepts `use_pvs=True` to enable the
+experiment; the default remains full-window alpha-beta until PVS demonstrates
+a repeatable benefit.
+
+Regression tests compare PVS and full-window minimax scores at depth three for
+both White-to-move and Black-to-move positions, and verify board-state
+restoration. The CI benchmark now runs both modes on the same fixed positions,
+depth, repetition count, and runner.
+
+### Paired CI comparison
+
+Workflow
+[43775677962](https://github.com/Nomusa990822/Chess-AI/actions/runs/43775677962)
+passed the complete test suite and both benchmark modes (depth two, two
+repetitions). Median end-to-end call times were:
+
+| Position | Full-window (s) | PVS (s) | Full-window nodes | PVS nodes |
+|---|---:|---:|---:|---:|
+| Opening | 0.4132 | 0.4989 | 193 | 221 |
+| Middlegame | 3.0133 | 3.0397 | 174 | 175 |
+| Endgame | 0.0744 | 0.0795 | 58 | 62 |
+
+Both modes selected the same move and returned the same score in each
+benchmark position. At this shallow depth PVS was slower in all three
+positions and visited slightly more nodes. The measurements do not justify
+making PVS the default. It therefore remains available for controlled
+experiments while the production/default path continues using the existing
+full-window search. A deeper paired benchmark is needed before reconsidering
+that decision; no strength or Elo claim is inferred from these timings.
