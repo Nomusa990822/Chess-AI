@@ -6,6 +6,7 @@ from copy import deepcopy
 from evaluation import evaluate_position, explain_move, get_game_phase
 
 CHECKMATE_SCORE = 9999
+PVS_WINDOW = 1e-6
 PIECE_VALUES = {"K": 0, "Q": 9, "R": 5, "B": 3.25, "N": 3, "P": 1}
 
 
@@ -135,7 +136,8 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
         "score": 0.0, "depth_reached": 0, "explanation": "",
         "top_lines": [], "principal_variation": [],
         "phase": get_game_phase(gs.board), "timed_out": False,
-        "completed_iterations": [], "killer_moves": {}, "history_scores": {}
+        "completed_iterations": [], "killer_moves": {}, "history_scores": {},
+        "pvs_null_window_searches": 0, "pvs_researches": 0
     }
 
     best_move = valid_moves[0] if valid_moves else None
@@ -218,7 +220,7 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0):
     return best_move, stats
 
 
-def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline, ply=0):
+def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline, ply=0, use_pvs=True):
     """White-perspective minimax. Raises SearchTimeout; never returns partial scores."""
     _check_deadline(deadline)
     stats["nodes"] += 1
@@ -255,12 +257,27 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
 
     if maximizing_player:
         best_score = -float("inf")
-        for move in moves:
+        for move_index, move in enumerate(moves):
             _check_deadline(deadline)
             gs.make_move(move)
             try:
-                score, child_pv = minimax(gs, depth - 1, alpha, beta, False,
-                                          mode, tt, stats, deadline, ply + 1)
+                if use_pvs and move_index > 0:
+                    stats["pvs_null_window_searches"] = stats.get("pvs_null_window_searches", 0) + 1
+                    score, child_pv = minimax(
+                        gs, depth - 1, alpha, min(beta, alpha + PVS_WINDOW),
+                        False, mode, tt, stats, deadline, ply + 1, use_pvs
+                    )
+                    if alpha < score < beta:
+                        stats["pvs_researches"] = stats.get("pvs_researches", 0) + 1
+                        score, child_pv = minimax(
+                            gs, depth - 1, alpha, beta, False, mode, tt,
+                            stats, deadline, ply + 1, use_pvs
+                        )
+                else:
+                    score, child_pv = minimax(
+                        gs, depth - 1, alpha, beta, False, mode, tt,
+                        stats, deadline, ply + 1, use_pvs
+                    )
             finally:
                 gs.undo_move()
             if score > best_score:
@@ -273,12 +290,27 @@ def minimax(gs, depth, alpha, beta, maximizing_player, mode, tt, stats, deadline
                 break
     else:
         best_score = float("inf")
-        for move in moves:
+        for move_index, move in enumerate(moves):
             _check_deadline(deadline)
             gs.make_move(move)
             try:
-                score, child_pv = minimax(gs, depth - 1, alpha, beta, True,
-                                          mode, tt, stats, deadline, ply + 1)
+                if use_pvs and move_index > 0:
+                    stats["pvs_null_window_searches"] = stats.get("pvs_null_window_searches", 0) + 1
+                    score, child_pv = minimax(
+                        gs, depth - 1, max(alpha, beta - PVS_WINDOW), beta,
+                        True, mode, tt, stats, deadline, ply + 1, use_pvs
+                    )
+                    if alpha < score < beta:
+                        stats["pvs_researches"] = stats.get("pvs_researches", 0) + 1
+                        score, child_pv = minimax(
+                            gs, depth - 1, alpha, beta, True, mode, tt,
+                            stats, deadline, ply + 1, use_pvs
+                        )
+                else:
+                    score, child_pv = minimax(
+                        gs, depth - 1, alpha, beta, True, mode, tt,
+                        stats, deadline, ply + 1, use_pvs
+                    )
             finally:
                 gs.undo_move()
             if score < best_score:
