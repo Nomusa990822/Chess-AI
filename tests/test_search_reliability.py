@@ -223,3 +223,64 @@ def test_pvs_matches_full_window_minimax_and_restores_state(black_to_move):
     assert pvs_line
     assert pvs_stats["pvs_null_window_searches"] > 0
     assert state_snapshot(gs) == before
+
+
+@pytest.mark.parametrize("fen", [
+    # Complex middlegame with castling rights and tactical contact.
+    "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1",
+    # Black-to-move variant exercises the minimizing root.
+    "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R b KQkq - 0 1",
+    # Sparse pawn ending with kings and a passed-pawn race potential.
+    "8/5pk1/6p1/8/3P4/5K2/8/8 w - - 0 1",
+])
+def test_pvs_matches_full_window_and_returns_legal_principal_variation(fen):
+    from tests.test_perft import engine_move_uci, load_fen_position
+
+    gs = load_fen_position(fen)
+    before = state_snapshot(gs)
+
+    def search(use_pvs):
+        stats = {
+            "nodes": 0, "prunes": 0, "tt_hits": 0, "q_nodes": 0,
+            "killer_moves": {}, "history_scores": {},
+            "pvs_null_window_searches": 0, "pvs_researches": 0,
+        }
+        score, pv = ai.minimax(
+            gs, 2, -float("inf"), float("inf"), gs.white_to_move,
+            "fair", {}, stats, time.monotonic() + 60, use_pvs=use_pvs
+        )
+        return score, pv, stats
+
+    reference_score, _, _ = search(False)
+    pvs_score, pv, pvs_stats = search(True)
+
+    assert pvs_score == pytest.approx(reference_score, abs=1e-9)
+    assert pv, "PVS must return a principal variation for a non-terminal position"
+
+    # Replay every reported PV move against the live legal-move generator.
+    for uci in pv:
+        legal_by_uci = {engine_move_uci(move): move for move in gs.get_valid_moves()}
+        assert uci in legal_by_uci, f"PVS returned illegal PV move {uci} in {fen}"
+        gs.make_move(legal_by_uci[uci])
+
+    assert state_snapshot(gs) != before  # The PV was actually replayed.
+    while gs.move_log:
+        gs.undo_move()
+    assert state_snapshot(gs) == before
+    assert pvs_stats["pvs_null_window_searches"] > 0
+
+
+@pytest.mark.parametrize("use_pvs", [False, True])
+def test_choose_move_expired_deadline_preserves_state_in_both_search_modes(use_pvs):
+    gs = GameState()
+    before = state_snapshot(gs)
+    legal_moves = gs.get_valid_moves()
+
+    move, info = ai.choose_ai_move(
+        gs, legal_moves, max_depth=4, time_budget=0, use_pvs=use_pvs
+    )
+
+    assert move in legal_moves
+    assert info["depth_reached"] == 0
+    assert info["timed_out"] is True
+    assert state_snapshot(gs) == before
