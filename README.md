@@ -602,7 +602,8 @@ The tests help validate individual components and important game behaviours.
 
 - [ ] Zobrist hashing for efficient position identification
 - [x] Killer-move and history heuristics
-- [x] Aspiration windows (implemented as an opt-in experiment)
+- [x] Principal Variation Search (experimental, opt-in)
+- [x] Aspiration windows (experimental, opt-in) (implemented as an opt-in experiment)
 - [ ] Opening-book integration
 - [ ] Endgame tablebase support
 - [ ] PGN import and export
