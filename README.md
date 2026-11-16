@@ -317,171 +317,6 @@ flowchart TD
 
 Minimax evaluates possible moves under the assumption that both players make rational decisions. At each level, the engine alternates between maximising and minimising the evaluation score.
 
-### Mathematical Foundations: From Board State to Decision
-
-The engine treats chess as a two-player, zero-sum, perfect-information game.
-Every non-terminal position receives a **White-perspective** score: positive
-favours White, negative favours Black. If \(s\) is a state, \(A(s)\) its
-legal moves, \(T(s,a)\) the resulting state, and \(E(s)\) the static
-evaluation, the depth-limited Minimax recurrence is:
-
-$
-V(s,d)=
-\begin{cases}
-E(s), & d=0,\\
-\max_{a\in A(s)} V(T(s,a),d-1), & \text{White to move},\\
-\min_{a\in A(s)} V(T(s,a),d-1), & \text{Black to move}.
-\end{cases}
-$
-
-This formalises the adversarial assumption: each side chooses the move that
-maximises its own outcome, which is equivalent to White maximising and Black
-minimising a single White-perspective score.
-
-#### Minimax decision tree
-
-```mermaid
-flowchart TD
-    R["White to move"] --> A["Candidate A"]
-    R --> B["Candidate B"]
-    A --> A1["Black reply: +0.4"]
-    A --> A2["Black reply: -1.2"]
-    B --> B1["Black reply: +0.1"]
-    B --> B2["Black reply: -0.3"]
-    A1 --> AM["A = min(0.4, -1.2) = -1.2"]
-    A2 --> AM
-    B1 --> BM["B = min(0.1, -0.3) = -0.3"]
-    B2 --> BM
-    AM --> C["White = max(-1.2, -0.3)"]
-    BM --> C
-    C --> D["Choose B"]
-```
-
-#### Alpha-Beta bounds and pruning
-
-Alpha-Beta keeps two bounds along the current path:
-
-- \(\alpha\): the best value already guaranteed to the maximizing player.
-- \(\beta\): the best value already guaranteed to the minimizing player.
-
-$
-\alpha\leftarrow\max(\alpha,v),\qquad
-\beta\leftarrow\min(\beta,v)
-$
-
-When
-
-$
-\boxed{\alpha\geq\beta}
-$
-
-the remaining siblings cannot affect the ancestor's decision and are pruned.
-The returned minimax value is unchanged. With branching factor \(b\) and
-depth \(d\), plain minimax has a tree-size bound of \(O(b^d)\); ideal move
-ordering can bring Alpha-Beta's effective leaf count towards
-\(O(b^{d/2})\), while its worst case remains \(O(b^d)\).
-
-```mermaid
-flowchart TD
-    N["Search node (α, β)"] --> V["Evaluate child value v"]
-    V --> K{"Node type?"}
-    K -->|"White / Max"| A["α = max(α, v)"]
-    K -->|"Black / Min"| B["β = min(β, v)"]
-    A --> C{"α ≥ β?"}
-    B --> C
-    C -->|"Yes"| P["Prune remaining siblings"]
-    C -->|"No"| M["Continue searching"]
-```
-
-#### Iterative deepening and time budget
-
-The search completes depths \(1,2,\ldots,D\). If \(m_d\) and \(v_d\) are
-the move and score from a completed iteration, only the deepest completed
-pair is published. A timeout during depth \(d+1\) therefore does not replace
-the last complete result with a partial search.
-
-#### Evaluation as a weighted mathematical model
-
-For non-terminal states, the handcrafted evaluation is a weighted sum:
-
-$
-E_m(s)=\sum_i w_{m,i}f_i(s)
-$
-
-where \(f_i\) are material and positional features, and \(w_{m,i}\) are
-the weights for Fair, Hard or Forced mode. Material is:
-
-$
-M(s)=\sum_{p\in P(s)}c(p)v(p),\quad
-c(p)=\begin{cases}+1&\text{White}\\-1&\text{Black}\end{cases}
-$
-
-with pawn = 1, knight = 3, bishop = 3.25, rook = 5, queen = 9 and king = 0.
-The feature vector additionally includes piece-square tables, centre control,
-pawn structure, bishop pair, rook activity, knight outposts, king shield,
-mobility, king activity and edge pressure.
-
-Some implemented terms have particularly direct expressions:
-
-$
-\text{Mobility}(s)=0.05(L_W-L_B)
-$
-
-$
-D_1=|r_W-r_B|+|c_W-c_B|,\qquad
-\text{KingActivity}(s)=\pm0.04(14-D_1)
-$
-
-The king-activity term is active only in an endgame when one side has a material
-advantage. The phase is selected from total non-king material \(Q\): opening
-if \(Q>40\), middlegame if \(18<Q\leq40\), and endgame if \(Q\leq18\).
-Terminal checkmate and draw scores override this heuristic evaluation.
-
-```mermaid
-flowchart LR
-    S["Board and history"] --> P["Determine game phase"]
-    S --> F["Compute feature vector f(s)"]
-    P --> F
-    F --> W["Apply mode weights w(m)"]
-    W --> E["Sum Eₘ(s) = Σ wᵢ fᵢ(s)"]
-    E --> R["White-perspective score"]
-    S --> T["Terminal-state check"]
-    T -->|"Mate / draw"| O["Terminal score overrides E(s)"]
-    T -->|"Non-terminal"| E
-```
-
-#### Further search mathematics
-
-- **Transposition table:** stores \((key,depth,score,bound,best\ move,PV)\).
-  Exact entries are exact at the searched depth; lower and upper bounds tighten
-  the active window. The key includes board identity, halfmove clock and
-  repetition history so draw context is not incorrectly conflated.
-- **Move ordering:** a quiet move causing a cutoff updates its history value by
-  \(H\leftarrow\min(H_{max},H+d^2)\); up to two killer moves are retained per
-  ply. Ordering changes efficiency, not the minimax definition.
-- **Quiescence:** extends a leaf through captures and promotions; when in check
-  it searches all legal evasions because stand-pat is invalid. The extension
-  has a hard depth cap of 8.
-- **Principal Variation Search (experimental):** searches the first ordered
-  move with the full window and later moves with a null window of
-  \(\varepsilon=10^{-6}\), re-searching a move with the full window when its
-  narrow-window result may improve the incumbent.
-- **Aspiration windows (experimental):** centres \([\alpha,\beta]\) around
-  the previous completed score \(v_{d-1}\), using
-  \(\alpha=v_{d-1}-w\) and \(\beta=v_{d-1}+w\). Fail-low/high results
-  widen and retry; after the retry limit, search returns to a full window.
-  Adaptive sizing uses
-  \(\Delta_d=|v_{d-1}-v_{d-2}|\) and
-  \(w_d=\operatorname{clip}_{[0.1,4.0]}(w_0(0.5+0.5\min(\Delta_d,4)))\).
-
-These equations describe the implemented heuristic model and bounded search;
-they do not imply that the engine has searched the complete chess game tree or
-proved a globally optimal move. The full derivations, feature constants,
-weight table and algorithm-by-algorithm discussion are in the
-[Mathematical Foundations reference](docs/mathematical_foundations.md).
-
----
-
 ### Alpha-Beta Pruning
 
 Alpha-Beta pruning improves search efficiency by eliminating branches that cannot affect the final result. It maintains two bounds:
@@ -513,6 +348,197 @@ A fixed search depth can terminate in the middle of a tactical sequence, creatin
 ### Principal Variation
 
 The principal variation (PV) represents the engine's best predicted continuation from the current position. It provides a readable line of moves associated with the search result.
+
+### Mathematical Foundations: From Board State to Decision
+
+The engine treats chess as a two-player, zero-sum, perfect-information game. Every non-terminal position receives a **White-perspective** score: positive favours White, negative favours Black. If $s$ is a state, $A(s)$ its legal moves, $T(s,a)$ the resulting state, $R(s)$ the result of a terminal state and $E(s)$ the static evaluation, the depth-limited Minimax recurrence is:
+
+$$
+V(s,d)=
+\begin{cases}
+R(s), & s \text{ is terminal},\\
+E(s), & d=0,\\
+\max\limits_{a\in A(s)} V\bigl(T(s,a),\,d-1\bigr), & \text{White to move},\\
+\min\limits_{a\in A(s)} V\bigl(T(s,a),\,d-1\bigr), & \text{Black to move}.
+\end{cases}
+$$
+
+This formalises the adversarial assumption: each side chooses the move that is best for itself, which is equivalent to White maximising and Black minimising a single White-perspective score.
+
+#### Minimax decision tree
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryTextColor": "#171A21",
+    "lineColor": "#5b6270"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 30, "rankSpacing": 40, "htmlLabels": true }
+}}%%
+flowchart TD
+    R["White to move"] --> A["Candidate A"]
+    R --> B["Candidate B"]
+    A --> A1["Black reply: +0.4"]
+    A --> A2["Black reply: -1.2"]
+    B --> B1["Black reply: +0.1"]
+    B --> B2["Black reply: -0.3"]
+    A1 --> AM["A = min(0.4, -1.2) = -1.2"]
+    A2 --> AM
+    B1 --> BM["B = min(0.1, -0.3) = -0.3"]
+    B2 --> BM
+    AM --> C["White = max(-1.2, -0.3)"]
+    BM --> C
+    C --> D["Choose B"]
+
+    classDef root  fill:#171A21,stroke:#171A21,color:#F4F0E6;
+    classDef cand  fill:#F7EFD9,stroke:#C6A15B,stroke-width:1.5px,color:#171A21;
+    classDef reply fill:#F4F0E6,stroke:#AAB3C0,color:#171A21;
+    classDef calc  fill:#EFE3E6,stroke:#8C5260,stroke-width:1.5px,color:#171A21;
+    classDef final fill:#C6A15B,stroke:#C6A15B,color:#171A21;
+    class R root;
+    class A,B cand;
+    class A1,A2,B1,B2 reply;
+    class AM,BM,C calc;
+    class D final;
+    linkStyle default stroke:#5b6270,stroke-width:1.5px
+```
+
+#### Alpha-Beta bounds and pruning
+
+Alpha-Beta keeps two bounds along the current path:
+
+- $\alpha$: the best value already guaranteed to the maximizing player.
+- $\beta$: the best value already guaranteed to the minimizing player.
+
+$$
+\alpha\leftarrow\max(\alpha,v),\qquad
+\beta\leftarrow\min(\beta,v)
+$$
+
+When
+
+$$
+\boxed{\alpha\geq\beta}
+$$
+
+the remaining siblings cannot affect the ancestor's decision and are pruned. The returned minimax value is unchanged. With branching factor $b$ and depth $d$, plain minimax has a tree-size bound of $O(b^d)$; ideal move ordering can bring Alpha-Beta's effective leaf count towards $O(b^{d/2})$, while its worst case remains $O(b^d)$.
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryTextColor": "#171A21",
+    "lineColor": "#5b6270"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 30, "rankSpacing": 40, "htmlLabels": true }
+}}%%
+flowchart TD
+    N["Search node (α, β)"] --> V["Evaluate child value v"]
+    V --> K{"Node type?"}
+    K -->|"White / Max"| A["α = max(α, v)"]
+    K -->|"Black / Min"| B["β = min(β, v)"]
+    A --> C{"α ≥ β?"}
+    B --> C
+    C -->|"Yes"| P["Prune remaining siblings"]
+    C -->|"No"| M["Continue searching"]
+
+    classDef start fill:#171A21,stroke:#171A21,color:#F4F0E6;
+    classDef step  fill:#F7EFD9,stroke:#C6A15B,stroke-width:1.5px,color:#171A21;
+    classDef gate  fill:#EFE3E6,stroke:#8C5260,stroke-width:1.5px,color:#171A21;
+    classDef final fill:#C6A15B,stroke:#C6A15B,color:#171A21;
+    class N start;
+    class V,A,B,M step;
+    class K,C gate;
+    class P final;
+    linkStyle default stroke:#5b6270,stroke-width:1.5px
+```
+
+#### Iterative deepening and time budget
+
+The search completes depths $1,2,\ldots,D$. If $m_d$ and $v_d$ are the move and score from a completed iteration, only the deepest completed pair is published. A timeout during depth $d+1$ therefore does not replace the last complete result with a partial search.
+
+#### Evaluation as a weighted mathematical model
+
+For non-terminal states, the handcrafted evaluation is a weighted sum:
+
+$$
+E_m(s)=\sum_i w_{m,i}\,f_i(s)
+$$
+
+where $f_i$ are material and positional features, and $w_{m,i}$ are the weights for Fair, Hard or Forced mode. Material is:
+
+$$
+M(s)=\sum_{p\in P(s)} c(p)\,v(p),
+\qquad
+c(p)=
+\begin{cases}
++1 & \text{White},\\
+-1 & \text{Black},
+\end{cases}
+$$
+
+with pawn = 1, knight = 3, bishop = 3.25, rook = 5, queen = 9 and king = 0. The feature vector additionally includes piece-square tables, centre control, pawn structure, bishop pair, rook activity, knight outposts, king shield, mobility, king activity and edge pressure.
+
+Some implemented terms have particularly direct expressions:
+
+$$
+\text{Mobility}(s)=0.05\,(L_W-L_B)
+$$
+
+$$
+D_1=\lvert r_W-r_B\rvert+\lvert c_W-c_B\rvert,
+\qquad
+\text{KingActivity}(s)=\pm 0.04\,(14-D_1)
+$$
+
+The king-activity term is active only in an endgame when one side has a material advantage. The phase is selected from total non-king material $Q$: opening if $Q>40$, middlegame if $18<Q\leq 40$, and endgame if $Q\leq 18$. Terminal checkmate and draw scores override this heuristic evaluation.
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Inter, Segoe UI, Helvetica, Arial, sans-serif",
+    "primaryTextColor": "#171A21",
+    "lineColor": "#5b6270"
+  },
+  "flowchart": { "curve": "basis", "nodeSpacing": 28, "rankSpacing": 44, "htmlLabels": true }
+}}%%
+flowchart LR
+    S["Board and history"] --> P["Determine game phase"]
+    S --> F["Compute feature vector f(s)"]
+    P --> F
+    F --> W["Apply mode weights w(m)"]
+    W --> E["Sum Eₘ(s) = Σ wᵢ fᵢ(s)"]
+    E --> R["White-perspective score"]
+    S --> T["Terminal-state check"]
+    T -->|"Mate / draw"| O["Terminal score overrides E(s)"]
+    T -->|"Non-terminal"| E
+
+    classDef start fill:#171A21,stroke:#171A21,color:#F4F0E6;
+    classDef step  fill:#F7EFD9,stroke:#C6A15B,stroke-width:1.5px,color:#171A21;
+    classDef gate  fill:#EFE3E6,stroke:#8C5260,stroke-width:1.5px,color:#171A21;
+    classDef final fill:#C6A15B,stroke:#C6A15B,color:#171A21;
+    class S start;
+    class P,F,W,E step;
+    class T gate;
+    class R,O final;
+    linkStyle default stroke:#5b6270,stroke-width:1.5px
+```
+
+#### Further search mathematics
+
+- **Transposition table:** stores $(\text{key},\ d,\ v,\ \text{bound},\ \text{best move},\ \text{PV})$. Exact entries are exact at the searched depth; lower and upper bounds tighten the active window. The key includes board identity, halfmove clock and repetition history so draw context is not incorrectly conflated.
+- **Move ordering:** a quiet move causing a cutoff updates its history value by $H\leftarrow\min(H_{\max},\,H+d^2)$; up to two killer moves are retained per ply. Ordering changes efficiency, not the minimax definition.
+- **Quiescence:** extends a leaf through captures and promotions; when in check it searches all legal evasions because stand-pat is invalid. The extension has a hard depth cap of 8.
+- **Principal Variation Search (experimental):** searches the first ordered move with the full window and later moves with a null window of $\varepsilon=10^{-6}$, re-searching a move with the full window when its narrow-window result may improve the incumbent.
+- **Aspiration windows (experimental):** centres $[\alpha,\beta]$ around the previous completed score $v_{d-1}$, using $\alpha=v_{d-1}-w$ and $\beta=v_{d-1}+w$. Fail-low/high results widen and retry; after the retry limit, search returns to a full window. Adaptive sizing uses $\Delta_d=\lvert v_{d-1}-v_{d-2}\rvert$ and
+  $w_d=\operatorname{clip}_{[0.1,\,4.0]}\bigl(w_0\,(0.5+0.5\min(\Delta_d,4))\bigr)$.
+
+> [!NOTE]
+> These equations describe the implemented heuristic model and bounded search. They do not imply that the engine has searched the complete chess game tree or proved a globally optimal move. The full derivations, feature constants, weight table and algorithm-by-algorithm discussion are in the [Mathematical Foundations reference](docs/mathematical_foundations.md).
 
 ---
 
@@ -665,7 +691,12 @@ Chess-AI/
 │
 ├── docs/
 │   ├── architecture.md
-│   └── search_notes.md
+│   ├── search_notes.md
+│   ├── mathematical_foundations.md
+│   └── phase1_search_reliability_audit.md
+│
+├── benchmarks/
+│   └── aspiration_window_sweep.py
 │
 ├── tests/
 │   ├── test_engine.py
@@ -764,12 +795,12 @@ The tests help validate individual components and important game behaviours.
 - No graphical user interface is currently included.
 - The Forced-Win preset does not automatically adapt to the selected AI colour.
 
-### Potential Improvements
+### Roadmap
 
 - [ ] Zobrist hashing for efficient position identification
 - [x] Killer-move and history heuristics
 - [x] Principal Variation Search (experimental, opt-in)
-- [x] Aspiration windows (experimental, opt-in) (implemented as an opt-in experiment)
+- [x] Aspiration windows (experimental, opt-in)
 - [ ] Opening-book integration
 - [ ] Endgame tablebase support
 - [ ] PGN import and export
