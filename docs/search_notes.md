@@ -1,199 +1,89 @@
 # Search & Decision-Making Notes
 
-## Overview
+This note summarises the implemented search pipeline. The complete mathematical
+derivations and feature equations are in
+[Mathematical Foundations](mathematical_foundations.md).
 
-The Chess AI uses **adversarial search** to determine the best move.
+## Search model
 
-It assumes:
-> Both players play optimally.
+The engine treats chess as a deterministic, two-player, zero-sum,
+perfect-information game. Evaluation scores are always from White's
+perspective. White maximises the score and Black minimises it.
 
-The search process explores future positions and evaluates them to choose the most favorable outcome.
+For state \(s\), legal actions \(A(s)\), transition \(T(s,a)\), static
+evaluation \(E(s)\), and remaining depth \(d\):
 
----
+\[
+V(s,d)=
+\begin{cases}
+E(s), & d=0,\\
+\max_{a\in A(s)}V(T(s,a),d-1), & \text{White to move},\\
+\min_{a\in A(s)}V(T(s,a),d-1), & \text{Black to move}.
+\end{cases}
+\]
 
-## Core Search Flow
+## Alpha-Beta pruning
 
-```mermaid
-flowchart TD
-    A[Current Position] --> B[Generate Moves]
-    B --> C[Order Moves]
-    C --> D[Iterative Deepening]
-    D --> E[Minimax Search]
-    E --> F[Alpha-Beta Pruning]
-    F --> G[Transposition Table]
-    G --> H[Quiescence Search]
-    H --> I[Evaluation]
-    I --> J[Best Move Selection]
-```
+Alpha-Beta maintains a lower bound \(\alpha\) for the maximizing player and
+an upper bound \(\beta\) for the minimizing player. A branch is cut off when
+\(\alpha\geq\beta\). Pruning preserves the minimax result while reducing
+the number of nodes that need to be visited. Its effectiveness depends strongly
+on move ordering.
 
----
+## Iterative deepening and deadlines
 
-## Minimax Algorithm
+The search completes depth 1, then 2, then 3, up to the configured limit or
+deadline. Only a fully completed iteration replaces the current best move,
+score and principal variation. A timeout never publishes a partial iteration.
 
-Minimax models chess as a two-player zero-sum game.
-* Max player (White) → maximize score
-* Min player (Black) → minimize score
+## Move ordering
 
-**Recurrence:**
+The ordering pipeline prioritises a transposition-table move, tactical moves,
+killer moves and history-scored quiet moves. A quiet beta/alpha cutoff updates
+the history score by \(d^2\), capped at 1,000,000; up to two killer moves are
+kept per ply. These heuristics influence search order, not move legality or
+the evaluation function.
 
-> max(node) = max(child values)
-> min(node) = min(child values)
+## Transposition table
 
----
+Entries contain search depth, score, bound type, best move and principal
+variation. Exact entries can be returned directly; lower/upper bounds tighten
+the active alpha/beta window. The key includes position identity, halfmove
+clock and a sorted repetition-history snapshot to avoid reusing a score across
+different draw contexts. Replacement favours deeper entries and exact entries
+at equal depth.
 
-## Alpha-Beta Pruning
-Reduces the number of nodes explored.
+## Quiescence search
 
-**Key Idea:**
-Skip branches that cannot influence the final decision.
-* Alpha = best value for maximizer
-* Beta = best value for minimizer
+At a quiet leaf, stand-pat evaluation is considered alongside captures and
+promotions. If the side to move is in check, stand-pat is invalid and all legal
+evasions are searched, including quiet evasions. A hard quiescence-depth cap of
+8 bounds the extension.
 
-If:
-```
-alpha ≥ beta → prune branch
-```
+## Experimental search modes
 
----
+- **PVS:** first ordered move uses the full window; later moves use a
+  null-window probe of width \(10^{-6}\), with full-window re-search when the
+  result may improve the incumbent.
+- **Aspiration windows:** centre the search window around the previous
+  completed iteration's score; widen and retry on fail-low/fail-high, then
+  fall back to a full window after the retry limit.
+- **Adaptive aspiration:** adjusts the next window using the absolute change
+  between completed iteration scores. Benchmarks show no consistent advantage
+  over fixed width 0.5.
 
-## Iterative Deepening
+Full-window Alpha-Beta remains the production default. PVS and aspiration
+variants are opt-in experiments; the benchmark evidence does not justify
+claiming a general speedup or playing-strength/Elo gain.
 
-Instead of searching to full depth immediately:
-* search depth 1
-* then depth 2
-* then depth 3...
+## Complexity and limitations
 
-**Benefits:**
-* always has a usable move
-* improves move ordering
-* supports time control
+With branching factor \(b\) and depth \(d\), minimax has a worst-case
+tree-size order of \(O(b^d)\). Ideal move ordering can bring Alpha-Beta's
+effective leaf count towards \(O(b^{d/2})\); poor ordering retains the
+\(O(b^d)\) worst case. Quiescence reduces some horizon effects but cannot
+guarantee that all long tactical sequences are resolved.
 
----
-
-## Move Ordering
-
-Strong moves are searched first to improve pruning.
-
-Typical ordering:
-* captures
-* checks
-* promotions
-* killer moves (future upgrade)
-
----
-
-## Quiescence Search
-
-**Problem: Horizon Effect**
-The engine might stop searching in unstable positions.
-
-**Solution:**
-Extend search for:
-* captures
-* tactical sequences
-
-Until position becomes quiet.
-
----
-
-## Transposition Table
-
-Caches previously evaluated positions.
-
-**Benefits:**
-* avoids recomputation
-* speeds up search
-* improves pruning
-
----
-
-## Principal Variation (PV)
-
-The PV is the engine’s best predicted line of play.
-
-**Example:**
-```
-d7d5 → e2e3 → e7e5
-```
-
----
-
-## Evaluation Function
-
-At leaf nodes, positions are scored using:
-* material
-* positional factors
-* pawn structure
-* mobility
-* king safety
-* game phase
-
----
-
-## Decision Pipeline
-
-1. Generate legal moves
-2. Simulate each move
-3. Explore future positions
-4. Evaluate resulting positions
-5. Compare scores
-6. Choose best move
-
----
-
-## Limitations
-
-**1. Exponential Growth**
-
-Search complexity grows rapidly:
-```
-O(b^d)
-```
-Where:
-* b = branching factor (~35 in chess)
-* d = depth
-
-**2. Horizon Effect**
-
-Even with quiescence, long-term tactics may be missed.
-
-**3. No Learning**
-
-The engine does not adapt or learn from games.
-
----
-
-## Future Improvements
-* killer move heuristic
-* history heuristic
-* aspiration windows
-* Zobrist hashing
-* opening book
-* endgame tablebases
-
----
-
-## Key Insight
-
-This system demonstrates that:
-> Strong decision-making can emerge from structured search + evaluation.
-
-Without neural networks, the engine can still:
-* plan ahead
-* evaluate positions
-* explain decisions
-
----
-
-## Conclusion
-
-The search system is the core intelligence of the engine.
-
-**It transforms:**
-* a static board into
-* a strategic decision
-
-**by combining:**
-* exploration (search)
-* evaluation (heuristics)
-* optimization (pruning)
+The search is depth- and time-bounded, and the leaf evaluator is handcrafted.
+Consequently, a minimax result is optimal only relative to the searched tree
+and its evaluation model, not a proof of the globally optimal chess move.

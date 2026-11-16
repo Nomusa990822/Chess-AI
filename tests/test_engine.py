@@ -225,22 +225,198 @@ def test_kingside_castle_move_is_generated():
 
 
 def test_draw_by_repetition_flag():
-    """
-    Repeating the same position three times should trigger repetition draw.
-    """
+    """Three occurrences of a genuinely repeated legal position are detected."""
     gs = GameState()
-
-    # Repeat a knight shuffle
-    move1 = Move((7, 6), (5, 5), gs.board)  # g1f3
-    move2 = Move((0, 6), (2, 5), gs.board)  # g8f6
-    move3 = Move((5, 5), (7, 6), gs.board)  # f3g1
-    move4 = Move((2, 5), (0, 6), gs.board)  # f6g8
-
-    for _ in range(3):
-        gs.make_move(move1)
-        gs.make_move(move2)
-        gs.make_move(move3)
-        gs.make_move(move4)
-
+    for _ in range(2):
+        gs.make_move(Move((7, 6), (5, 5), gs.board))  # g1f3
+        gs.make_move(Move((0, 6), (2, 5), gs.board))  # g8f6
+        gs.make_move(Move((5, 5), (7, 6), gs.board))  # f3g1
+        gs.make_move(Move((2, 5), (0, 6), gs.board))  # f6g8
     gs.update_game_status()
     assert gs.draw_by_repetition is True
+
+
+def test_halfmove_clock_resets_and_restores_for_pawn_move():
+    gs = GameState()
+    gs.halfmove_clock = 17
+    gs.halfmove_clock_log = [17]
+    move = Move((6, 4), (4, 4), gs.board)
+    gs.make_move(move)
+    assert gs.halfmove_clock == 0
+    gs.undo_move()
+    assert gs.halfmove_clock == 17
+
+def test_quiet_move_increments_and_undo_restores_halfmove_clock():
+    gs = GameState()
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    assert gs.halfmove_clock == 1
+    gs.undo_move()
+    assert gs.halfmove_clock == 0
+
+def test_fifty_move_draw_flag_at_one_hundred_halfmoves():
+    gs = GameState()
+    gs.halfmove_clock = 99
+    gs.halfmove_clock_log = [99]
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    gs.update_game_status()
+    assert gs.halfmove_clock == 100
+    assert gs.draw_by_fifty_move is True
+
+
+def _load_repetition_fen(fen):
+    """Build a minimal GameState from a FEN fixture for repetition-key tests."""
+    from engine import CastleRights
+
+    gs = GameState()
+    fields = fen.split()
+    board = []
+    for fen_row in fields[0].split("/"):
+        row = []
+        for symbol in fen_row:
+            if symbol.isdigit():
+                row.extend(["--"] * int(symbol))
+            else:
+                row.append(("w" if symbol.isupper() else "b") + symbol.upper())
+        board.append(row)
+    gs.board = board
+    gs.white_to_move = fields[1] == "w"
+    rights = fields[2]
+    gs.current_castling_rights = CastleRights(
+        "K" in rights, "Q" in rights, "k" in rights, "q" in rights
+    )
+    gs.castle_rights_log = [gs.current_castling_rights.copy()]
+    files, ranks = "abcdefgh", "87654321"
+    ep = fields[3]
+    gs.en_passant_possible = () if ep == "-" else (ranks.index(ep[1]), files.index(ep[0]))
+    gs.en_passant_possible_log = [gs.en_passant_possible]
+    gs.halfmove_clock = int(fields[4]) if len(fields) > 4 else 0
+    gs.halfmove_clock_log = [gs.halfmove_clock]
+    for r in range(8):
+        for col in range(8):
+            if gs.board[r][col] == "wK":
+                gs.white_king_location = (r, col)
+            elif gs.board[r][col] == "bK":
+                gs.black_king_location = (r, col)
+    gs.position_counts = {}
+    gs.record_current_position()
+    return gs
+
+def test_repetition_key_ignores_unusable_en_passant_target():
+    a = _load_repetition_fen('4k3/8/8/4p3/8/8/8/4K3 w - e6 0 1')
+    b = _load_repetition_fen('4k3/8/8/4p3/8/8/8/4K3 w - - 0 1')
+    assert a.get_position_key() == b.get_position_key()
+
+def test_repetition_key_retains_legal_en_passant_right():
+    a = _load_repetition_fen('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
+    b = _load_repetition_fen('4k3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
+    assert a.has_legal_en_passant()
+    assert a.get_position_key() != b.get_position_key()
+
+def test_repetition_key_ignores_pinned_en_passant_capture():
+    a = _load_repetition_fen('k3r3/8/8/3pP3/8/8/8/4K3 w - d6 0 1')
+    b = _load_repetition_fen('k3r3/8/8/3pP3/8/8/8/4K3 w - - 0 1')
+    assert not a.has_legal_en_passant()
+    assert a.get_position_key() == b.get_position_key()
+
+def test_seventyfive_move_automatic_draw_at_150_halfmoves():
+    gs = GameState()
+    gs.halfmove_clock = 149
+    gs.halfmove_clock_log = [149]
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    gs.update_game_status()
+    assert gs.draw_by_seventyfive_move is True
+    assert gs.draw_by_fifty_move is True
+
+
+def test_fivefold_repetition_automatic_threshold():
+    gs = GameState()
+    for _ in range(4):
+        gs.make_move(Move((7, 6), (5, 5), gs.board))
+        gs.make_move(Move((0, 6), (2, 5), gs.board))
+        gs.make_move(Move((5, 5), (7, 6), gs.board))
+        gs.make_move(Move((2, 5), (0, 6), gs.board))
+    gs.update_game_status()
+    assert gs.draw_by_repetition is True
+    assert gs.draw_by_fivefold_repetition is True
+
+
+def test_insufficient_material_kings_only():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/4K3 w - - 0 1")
+    gs.update_game_status()
+    assert gs.draw_by_insufficient_material is True
+
+
+def test_insufficient_material_single_bishop_or_knight():
+    bishop = _load_repetition_fen("4k3/8/8/8/8/8/8/3BK3 w - - 0 1")
+    knight = _load_repetition_fen("4k3/8/8/8/8/8/8/3NK3 w - - 0 1")
+    assert bishop.is_insufficient_material()
+    assert knight.is_insufficient_material()
+
+
+def test_insufficient_material_same_colour_bishops_only():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/B1B1K3 w - - 0 1")
+    assert gs.is_insufficient_material()
+
+
+def test_material_with_rook_is_not_insufficient():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/3RK3 w - - 0 1")
+    assert not gs.is_insufficient_material()
+
+
+def test_opposite_colour_bishops_are_not_assumed_dead():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/8/2B1K2b w - - 0 1")
+    assert not gs.is_insufficient_material()
+
+
+def test_checkmate_takes_precedence_over_seventyfive_move_draw():
+    """FIDE's 75-move automatic draw does not override checkmate on the last move."""
+    from ai import CHECKMATE_SCORE, _terminal_score
+
+    gs = _load_repetition_fen("7k/6Q1/5K2/8/8/8/8/8 b - - 150 1")
+    score = _terminal_score(gs, ply=0)
+
+    assert gs.checkmate is True
+    assert gs.draw_by_seventyfive_move is True
+    assert score == CHECKMATE_SCORE
+
+
+def test_undo_restores_repetition_counts_exactly():
+    gs = GameState()
+    before = dict(gs.position_counts)
+    move = Move((7, 6), (5, 5), gs.board)
+    gs.make_move(move)
+    assert len(gs.position_counts) == 2
+    gs.undo_move()
+    assert gs.position_counts == before
+
+
+def test_castling_rights_are_part_of_repetition_identity():
+    with_rights = _load_repetition_fen("4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1")
+    without_rights = _load_repetition_fen("4k3/8/8/8/8/8/8/R3K2R w - - 0 1")
+    assert with_rights.get_position_key() != without_rights.get_position_key()
+
+
+def test_capture_resets_halfmove_clock_and_undo_restores_it():
+    gs = _load_repetition_fen("4k3/8/8/8/8/8/4p3/4K3 w - - 37 1")
+    # White king captures the adjacent black pawn.
+    move = Move((7, 4), (6, 4), gs.board)
+    gs.make_move(move)
+    assert gs.halfmove_clock == 0
+    gs.undo_move()
+    assert gs.halfmove_clock == 37
+
+
+def test_threefold_claim_threshold_is_distinct_from_fivefold_automatic():
+    gs = GameState()
+    for _ in range(2):
+        gs.make_move(Move((7, 6), (5, 5), gs.board))
+        gs.make_move(Move((0, 6), (2, 5), gs.board))
+        gs.make_move(Move((5, 5), (7, 6), gs.board))
+        gs.make_move(Move((2, 5), (0, 6), gs.board))
+    gs.update_game_status()
+    assert gs.position_counts[gs.get_position_key()] == 3
+    assert gs.draw_by_repetition is True
+    assert gs.draw_by_fivefold_repetition is False
