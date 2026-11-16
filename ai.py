@@ -154,11 +154,15 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
         "pvs_null_window_searches": 0, "pvs_researches": 0,
         "root_pvs_null_window_searches": 0, "root_pvs_researches": 0,
         "aspiration_searches": 0, "aspiration_retries": 0,
-        "aspiration_fail_low": 0, "aspiration_fail_high": 0,\n        "adaptive_aspiration_windows": [], "adaptive_score_changes": []\n    }
+        "aspiration_fail_low": 0, "aspiration_fail_high": 0,
+        "adaptive_aspiration_windows": [], "adaptive_score_changes": []
+    }
 
     best_move = valid_moves[0] if valid_moves else None
     best_score = evaluate_position(gs, mode)
     best_line = []
+    previous_completed_score = None
+    last_score_change = None
 
     for depth in range(1, max(0, max_depth) + 1):
         root_key = _transposition_key(gs)
@@ -170,8 +174,16 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
             best_move = None
             break
 
-        use_window = use_aspiration and stats["depth_reached"] > 0
-        window = max(float(aspiration_window), PVS_WINDOW)
+        aspiration_enabled = use_aspiration or use_adaptive_aspiration
+        use_window = aspiration_enabled and stats["depth_reached"] > 0
+        if use_adaptive_aspiration and last_score_change is not None:
+            window = adaptive_aspiration_window(last_score_change, aspiration_window)
+            stats["adaptive_aspiration_windows"].append(float(window))
+            stats["adaptive_score_changes"].append(float(last_score_change))
+        else:
+            window = max(float(aspiration_window), PVS_WINDOW)
+            if use_adaptive_aspiration and use_window:
+                stats["adaptive_aspiration_windows"].append(float(window))
         alpha = best_score - window if use_window else -float("inf")
         beta = best_score + window if use_window else float("inf")
         attempt = 0
@@ -267,6 +279,9 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
 
         if iteration_complete and iteration_best_move is not None:
             best_move = iteration_best_move
+            if previous_completed_score is not None:
+                last_score_change = abs(iteration_best_score - previous_completed_score)
+            previous_completed_score = iteration_best_score
             best_score = iteration_best_score
             best_line = iteration_best_line
             stats["depth_reached"] = depth
