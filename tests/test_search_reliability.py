@@ -406,3 +406,87 @@ def test_timeout_during_aspiration_retry_preserves_previous_completed_iteration(
     assert info["completed_iterations"] == [1]
     assert info["timed_out"] is True
     assert state_snapshot(gs) == state_snapshot(GameState())
+
+
+@pytest.mark.parametrize("score_change,expected", [
+    (0.0, 0.25),
+    (0.5, 0.375),
+    (1.0, 0.5),
+    (4.0, 1.25),
+    (20.0, 1.25),
+])
+def test_adaptive_aspiration_window_scales_with_score_stability(score_change, expected):
+    assert ai.adaptive_aspiration_window(score_change, 0.5) == pytest.approx(expected)
+
+
+def test_adaptive_aspiration_window_respects_bounds():
+    assert ai.adaptive_aspiration_window(0.0, 0.01) == pytest.approx(0.1)
+    assert ai.adaptive_aspiration_window(100.0, 100.0) == pytest.approx(4.0)
+
+
+def test_adaptive_aspiration_uses_score_change_from_completed_iterations(monkeypatch):
+    gs = GameState()
+    legal = gs.get_valid_moves()
+    calls = []
+
+    def controlled_minimax(position, depth, alpha, beta, maximizing, mode,
+                           tt, stats, deadline, ply=0, use_pvs=True):
+        calls.append((depth, alpha, beta))
+        # Depth-one root search establishes score 1; depth two establishes 1.1;
+        # depth three establishes 8.0, a deliberate large score swing.
+        score = {0: 0.0, 1: 1.0, 2: 1.1}.get(depth, 8.0)
+        return score, []
+
+    monkeypatch.setattr(ai, "minimax", controlled_minimax)
+    move, info = ai.choose_ai_move(
+        gs, legal, max_depth=3, time_budget=10,
+        use_adaptive_aspiration=True, aspiration_window=0.5,
+    )
+    assert move in legal
+    assert info["depth_reached"] == 3
+    assert info["adaptive_aspiration_windows"] == pytest.approx([0.5, 0.25, 1.25])
+    assert info["adaptive_score_changes"] == pytest.approx([0.1, 6.9])
+
+
+def test_adaptive_aspiration_timeout_keeps_last_completed_iteration(monkeypatch):
+    gs = GameState()
+    legal = gs.get_valid_moves()
+    calls = {"count": 0}
+
+    def controlled_minimax(position, depth, alpha, beta, maximizing, mode,
+                           tt, stats, deadline, ply=0, use_pvs=True):
+        calls["count"] += 1
+        if depth == 0:
+            return 0.0, []
+        if depth == 1:
+            return 1.0, []
+        raise ai.SearchTimeout
+
+    monkeypatch.setattr(ai, "minimax", controlled_minimax)
+    move, info = ai.choose_ai_move(
+        gs, legal, max_depth=4, time_budget=10,
+        use_adaptive_aspiration=True, aspiration_window=0.5,
+    )
+    assert move in legal
+    assert info["depth_reached"] == 1
+    assert info["completed_iterations"] == [1]
+    assert info["timed_out"] is True
+    assert state_snapshot(gs) == state_snapshot(GameState())
+
+
+def test_adaptive_aspiration_matches_full_window_move_and_score():
+    gs = GameState()
+    legal = gs.get_valid_moves()
+    before = state_snapshot(gs)
+    full_move, full_info = ai.choose_ai_move(
+        gs, legal, max_depth=2, time_budget=60
+    )
+    adaptive_move, adaptive_info = ai.choose_ai_move(
+        gs, legal, max_depth=2, time_budget=60,
+        use_adaptive_aspiration=True, use_pvs=True,
+    )
+    assert adaptive_move in legal
+    assert adaptive_info["depth_reached"] == 2
+    assert adaptive_move == full_move
+    assert adaptive_info["score"] == pytest.approx(full_info["score"], abs=1e-9)
+    assert state_snapshot(gs) == before
