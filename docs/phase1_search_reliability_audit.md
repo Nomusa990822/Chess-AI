@@ -638,3 +638,47 @@ point, not as a proven global optimum. Aspiration windows and PVS remain
 opt-in; full-window alpha-beta remains the production default. The new sweep
 is part of the Phase 1 CI workflow so future changes can be compared against
 the same position and width matrix. No playing-strength or Elo claim is made.
+
+
+## Adaptive aspiration-window experiment
+
+An additional opt-in mode, `use_adaptive_aspiration=True`, now adjusts the
+initial aspiration window from the absolute score change between the two most
+recently completed iterative-deepening iterations. The first aspiration
+iteration has no pair of completed search scores to compare, so it uses the
+configured base width (0.5 by default). Subsequent windows use a bounded,
+deterministic scaling rule: stable scores narrow the window, while larger
+score swings widen it. The current bounds are 0.1 to 4.0 evaluation points.
+Fail-low/fail-high widening and the full-window fallback remain unchanged.
+Adaptive mode implicitly enables aspiration search but does not enable PVS;
+PVS remains a separate opt-in flag.
+
+The adaptive window is based only on completed search results. A timeout does
+not publish a partial iteration or update the score-change history. The
+feature remains disabled by default; the production search path is unchanged.
+
+### Regression coverage
+
+New tests cover:
+- The deterministic window-scaling formula, including lower and upper bounds.
+- Stable and large score changes across completed iterative-deepening depths.
+- Timeout during a later adaptive iteration while preserving the last
+  completed result and the root board state.
+- Move/score parity with full-window alpha-beta while combining adaptive
+  aspiration and PVS.
+- Existing synthetic fail-low/fail-high retries and aspiration timeout tests,
+  which continue to exercise the retry/fallback machinery.
+
+### Adaptive benchmark methodology
+
+The aspiration sweep now optionally includes adaptive aspiration in its
+five-position comparison. With `--include-adaptive`, it compares full-window
+alpha-beta, plain PVS, adaptive PVS/aspiration, and the requested fixed-width
+sweep. Every mode must reach the requested depth, return a legal move, restore
+the root position and match the full-window selected move and score. CI runs
+the adaptive comparison at depth three (one repetition) across all five
+positions, in addition to the existing depth-two fixed-width sweep. Timings
+remain environment-sensitive and are not Elo or playing-strength evidence.
+
+**CI result:** pending the first complete run on the final documentation and
+workflow tree. Results and the tested commit will be recorded after that run.
