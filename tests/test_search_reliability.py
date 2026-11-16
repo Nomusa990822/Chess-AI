@@ -343,11 +343,19 @@ def test_aspiration_window_retries_and_falls_back_to_exact_search(
 
 
 @pytest.mark.parametrize("fen", [
+    # Quiet starting position.
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    # Quiet open-game development after 1.e4 e5.
+    "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+    # Tactical middlegame, White to move.
+    "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R w KQkq - 0 1",
+    # Same tactical middlegame, Black to move.
     "r3k2r/p1ppqpb1/bn2pnp1/2pP4/1p2P3/2N2N2/PPQBBPPP/R3K2R b KQkq - 0 1",
+    # Sparse pawn ending.
     "8/5pk1/6p1/8/3P4/5K2/8/8 w - - 0 1",
 ])
-def test_pvs_aspiration_matches_full_window_move_score_and_legal_pv(fen):
+@pytest.mark.parametrize("window", [0.05, 0.5, 2.0])
+def test_pvs_aspiration_matches_full_window_move_score_and_legal_pv(fen, window):
     from tests.test_perft import load_fen_position
 
     def run(use_pvs, use_aspiration):
@@ -357,7 +365,7 @@ def test_pvs_aspiration_matches_full_window_move_score_and_legal_pv(fen):
         move, info = ai.choose_ai_move(
             gs, legal, mode="fair", max_depth=2, time_budget=90,
             use_pvs=use_pvs, use_aspiration=use_aspiration,
-            aspiration_window=0.5,
+            aspiration_window=window,
         )
         assert info["depth_reached"] == 2
         assert move in legal
