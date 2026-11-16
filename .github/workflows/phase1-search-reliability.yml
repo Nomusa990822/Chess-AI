@@ -38,7 +38,7 @@ jobs:
   verify:
     name: Syntax and test suite
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
 
     steps:
       - name: Check out repository
@@ -67,4 +67,5 @@ jobs:
           python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode pvs
           python benchmarks/search_benchmark.py --depth 3 --repeats 1 --search-mode pvs-aspiration
           python benchmarks/aspiration_window_sweep.py --depth 2 --repeats 2 --windows 0.05,0.1,0.25,0.5,1.0,2.0
-          python benchmarks/aspiration_window_sweep.py --depth 3 --repeats 1 --windows 0.5 --include-adaptive
+          python benchmarks/aspiration_window_sweep.py --depth 3 --repeats 3 --windows 0.5 --include-adaptive --positions tactical_white,tactical_black,pawn_endgame
+          python benchmarks/aspiration_window_sweep.py --depth 4 --repeats 2 --windows 0.5 --include-adaptive --positions tactical_white,tactical_black,pawn_endgame
