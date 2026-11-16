@@ -554,3 +554,87 @@ Aspiration windows therefore remain experimental and opt-in, just like PVS.
 Full-window alpha-beta remains the default. The experiment is implemented,
 regression-tested and benchmarked; no claim of stronger play or Elo gain is
 made.
+
+
+
+## Aspiration-window stress testing and width sensitivity
+
+The next experiment expanded aspiration validation beyond the three initial
+fixed positions. A dedicated benchmark,
+`benchmarks/aspiration_window_sweep.py`, now checks five position types:
+
+- Quiet initial position.
+- Quiet open-game position after 1.e4 e5.
+- Complex tactical middlegame with White to move.
+- The same tactical middlegame with Black to move.
+- Sparse pawn endgame.
+
+Before searching, the benchmark validates each FEN with python-chess and
+compares the engine's legal root move set with python-chess. It then runs
+full-window alpha-beta, PVS without aspiration, and PVS with six initial
+aspiration widths: 0.05, 0.1, 0.25, 0.5, 1.0 and 2.0 evaluation points.
+Each configuration is repeated twice at depth two. The script fails if any
+configuration does not reach the requested depth, changes the root position,
+returns an illegal move, or differs from the full-window reference move or
+score. Reported times cover the complete `choose_ai_move` call, including
+explanation generation.
+
+### Stress sweep CI results
+
+Workflow
+[43778822628](https://github.com/Nomusa990822/Chess-AI/actions/runs/43778822628)
+passed on commit
+[32f290d8c2c3c9de6ea7ea169dfb846b6a2ef288](https://github.com/Nomusa990822/Chess-AI/commit/32f290d8c2c3c9de6ea7ea169dfb846b6a2ef288).
+Application compilation passed and the expanded complete suite passed:
+**120 tests in 110.31 seconds**. The original six fixed-position comparison
+runs and the five-position/six-width sensitivity sweep all completed.
+
+All five positions produced the same selected move and score in full-window,
+plain PVS, and every aspiration width:
+
+| Position | Selected move | Score (White perspective) |
+|---|---:|---:|
+| Quiet start | `b1c3` | 0.000 |
+| Quiet open game | `b1c3` | 0.000 |
+| Tactical, White to move | `e2a6` | -0.024 |
+| Tactical, Black to move | `b4c3` | -2.458 |
+| Pawn endgame | `f3e4` | -0.955 |
+
+Median elapsed seconds / nodes are shown below. Each aspiration cell also
+includes the median number of retries.
+
+| Position | Full-window | PVS | 0.05 | 0.1 | 0.25 | 0.5 | 1.0 | 2.0 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Quiet start | 0.414 / 193 | 0.557 / 273 | 0.428 / 236 / 2 | 0.610 / 325 / 2 | 0.626 / 319 / 1 | 0.436 / 214 / 0 | 0.555 / 273 / 0 | 0.557 / 273 / 0 |
+| Quiet open game | 1.561 / 286 | 1.541 / 395 | 1.522 / 378 / 2 | 2.266 / 519 / 2 | 1.787 / 469 / 1 | 1.345 / 315 / 0 | 1.541 / 395 / 0 | 1.541 / 395 / 0 |
+| Tactical, White | 3.021 / 174 | 2.726 / 174 | 2.573 / 174 / 0 | 2.624 / 174 / 0 | 2.682 / 174 / 0 | 2.686 / 174 / 0 | 2.701 / 174 / 0 | 2.710 / 174 / 0 |
+| Tactical, Black | 5.852 / 215 | 5.802 / 264 | 12.261 / 618 / 4 | 10.396 / 494 / 3 | 9.020 / 442 / 2 | 6.438 / 317 / 1 | 5.684 / 229 / 0 | 5.837 / 264 / 0 |
+| Pawn endgame | 0.076 / 58 | 0.085 / 72 | 0.102 / 101 / 2 | 0.091 / 88 / 1 | 0.082 / 69 / 0 | 0.083 / 72 / 0 | 0.084 / 72 / 0 | 0.084 / 72 / 0 |
+
+For aspiration columns, each cell is **seconds / nodes / retries**. Full-window
+and PVS columns are **seconds / nodes**. Values are medians of two repetitions
+on the same GitHub-hosted runner.
+
+### Findings and tuning decision
+
+The narrowest windows were not consistently efficient. The Black-to-move
+tactical position exposed the clearest failure case: width 0.05 caused four
+fail-high retries, width 0.1 caused three, width 0.25 caused two, and width
+0.5 caused one. Widths 1.0 and 2.0 avoided retries; 1.0 was the fastest
+measured configuration for that position. In the pawn ending, narrow widths
+caused fail-low retries, while 0.25 and wider avoided them. Quiet positions
+also showed that very narrow windows can trigger unnecessary retries.
+
+No single width was fastest across all five positions. Width 0.5 gave the
+best measured result for the quiet opening and quiet open game; 0.05 was
+fastest in the tactical White-to-move position, although all widths searched
+the same node count there; width 1.0 was fastest in the tactical Black-to-move
+position; and 0.25 was fastest in the pawn ending. These are two-repetition,
+depth-two microbenchmarks and should not be interpreted as broad performance
+guarantees.
+
+The current 0.5 default is retained as a balanced experimental starting
+point, not as a proven global optimum. Aspiration windows and PVS remain
+opt-in; full-window alpha-beta remains the production default. The new sweep
+is part of the Phase 1 CI workflow so future changes can be compared against
+the same position and width matrix. No playing-strength or Elo claim is made.
