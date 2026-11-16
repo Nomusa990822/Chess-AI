@@ -126,7 +126,21 @@ def _terminal_score(gs, ply):
     return None
 
 
-def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=False, use_aspiration=False, aspiration_window=0.5, max_aspiration_retries=4):
+def adaptive_aspiration_window(score_change, base_window=0.5,
+                                  minimum_window=0.1, maximum_window=4.0):
+    """Choose a bounded window: stable iteration scores narrow it; swings widen it.
+
+    score_change is the absolute difference between the two most recently
+    completed iterative-deepening scores, in evaluation points. The first
+    aspiration iteration has no such history and uses base_window unchanged.
+    """
+    base = max(float(minimum_window), min(float(maximum_window), float(base_window)))
+    change = max(0.0, float(score_change))
+    candidate = base * (0.5 + 0.5 * min(change, 4.0))
+    return max(float(minimum_window), min(float(maximum_window), candidate))
+
+
+def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, use_pvs=False, use_aspiration=False, aspiration_window=0.5, max_aspiration_retries=4, use_adaptive_aspiration=False):
     """Return (best_move, search_info); only fully completed depths are published."""
     started = time.monotonic()
     deadline = started + max(0.0, time_budget)
@@ -140,8 +154,7 @@ def choose_ai_move(gs, valid_moves, mode="fair", max_depth=4, time_budget=2.0, u
         "pvs_null_window_searches": 0, "pvs_researches": 0,
         "root_pvs_null_window_searches": 0, "root_pvs_researches": 0,
         "aspiration_searches": 0, "aspiration_retries": 0,
-        "aspiration_fail_low": 0, "aspiration_fail_high": 0
-    }
+        "aspiration_fail_low": 0, "aspiration_fail_high": 0,\n        "adaptive_aspiration_windows": [], "adaptive_score_changes": []\n    }
 
     best_move = valid_moves[0] if valid_moves else None
     best_score = evaluate_position(gs, mode)
