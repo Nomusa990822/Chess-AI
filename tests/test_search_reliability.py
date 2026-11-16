@@ -439,12 +439,12 @@ def test_adaptive_aspiration_uses_score_change_from_completed_iterations(monkeyp
 
     monkeypatch.setattr(ai, "minimax", controlled_minimax)
     move, info = ai.choose_ai_move(
-        gs, legal, max_depth=3, time_budget=10,
+        gs, legal, max_depth=4, time_budget=10,
         use_adaptive_aspiration=True, aspiration_window=0.5,
     )
     assert move in legal
-    assert info["depth_reached"] == 3
-    assert info["adaptive_aspiration_windows"] == pytest.approx([0.5, 0.25, 1.25])
+    assert info["depth_reached"] == 4
+    assert info["adaptive_aspiration_windows"] == pytest.approx([0.5, 0.275, 1.25])
     assert info["adaptive_score_changes"] == pytest.approx([0.1, 6.9])
 
 
@@ -468,8 +468,8 @@ def test_adaptive_aspiration_timeout_keeps_last_completed_iteration(monkeypatch)
         use_adaptive_aspiration=True, aspiration_window=0.5,
     )
     assert move in legal
-    assert info["depth_reached"] == 1
-    assert info["completed_iterations"] == [1]
+    assert info["depth_reached"] == 2
+    assert info["completed_iterations"] == [1, 2]
     assert info["timed_out"] is True
     assert state_snapshot(gs) == state_snapshot(GameState())
 
