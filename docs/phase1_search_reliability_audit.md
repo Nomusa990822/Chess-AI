@@ -648,7 +648,7 @@ recently completed iterative-deepening iterations. The first aspiration
 iteration has no pair of completed search scores to compare, so it uses the
 configured base width (0.5 by default). Subsequent windows use a bounded,
 deterministic scaling rule: stable scores narrow the window, while larger
-score swings widen it. The current bounds are 0.1 to 4.0 evaluation points.
+score swings widen it. The current bounds are 0.1 to 4.0 evaluation points. The raw scaling is\n`base_window * (0.5 + 0.5 * min(score_change, 4.0))`, clamped to those bounds.
 Fail-low/fail-high widening and the full-window fallback remain unchanged.
 Adaptive mode implicitly enables aspiration search but does not enable PVS;
 PVS remains a separate opt-in flag.
