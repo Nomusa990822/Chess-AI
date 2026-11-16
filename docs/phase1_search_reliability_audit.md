@@ -441,3 +441,114 @@ Root PVS is therefore implemented, tested, and measurable, but remains an
 experimental opt-in. Full-window alpha-beta remains the default because
 performance is position-dependent and no broad, repeatable advantage has
 been demonstrated.
+
+
+
+## Aspiration-window search experiment
+
+An opt-in aspiration-window mode has been added to the root iterative-deepening
+search. Starting at depth two, it centres a finite alpha-beta window on the
+score from the last fully completed iteration. Depth one remains a full-window
+search because no previous completed score exists. If the root result fails
+low or high, the corresponding bound is widened exponentially and the whole
+root iteration is searched again. After the configured retry limit, the engine
+uses a full-window pass to obtain an exact root result.
+
+The feature is exposed through
+`choose_ai_move(..., use_aspiration=True)`; it is disabled by default. It can
+be combined with the existing opt-in PVS mode. The default engine therefore
+continues to use full-window alpha-beta. Search diagnostics separately count
+aspiration-window iterations, retries, fail-low events and fail-high events.
+Only a fully completed iteration is published. A timeout during a retry leaves
+the previous completed depth and its move intact.
+
+### Correctness and failure-path tests
+
+The regression suite now includes:
+- Synthetic fail-high and fail-low cases that force aspiration retries and
+  exercise the bounded full-window fallback.
+- Three fixed FEN positions (opening, Black-to-move complex middlegame and
+  pawn endgame) comparing PVS with aspiration against full-window alpha-beta.
+  The selected root move and score must match, the principal variation must be
+  present, and the original board state must be restored.
+- A timeout deliberately injected during an aspiration retry; the last
+  completed depth-one result must remain published.
+- Existing PVS, legal-PV replay, move-state restoration and timeout tests.
+
+The first implementation/benchmark workflow run was superseded and cancelled
+while the benchmark script's newline formatting was corrected. The corrected
+workflow completed successfully as run
+[43777722334](https://github.com/Nomusa990822/Chess-AI/actions/runs/43777722334)
+on commit
+[51454e38f39f5cea9e72ddada7d29d942b0e6bb4](https://github.com/Nomusa990822/Chess-AI/commit/51454e38f39f5cea9e72ddada7d29d942b0e6bb4).
+Python 3.12 compilation passed and the complete suite passed: **108 tests**.
+All six fixed-position benchmark invocations (three modes at depths two and
+three) completed at the requested depth.
+
+### Three-way benchmark methodology
+
+The benchmark compares:
+1. Full-window alpha-beta (`full-window`).
+2. Principal Variation Search (`pvs`).
+3. PVS with aspiration windows (`pvs-aspiration`).
+
+All modes use the same three fixed FEN positions, move ordering, evaluation,
+runner class and public `choose_ai_move` entry point. Depth two uses two
+repetitions and reports medians; depth three uses one sample. Elapsed time
+covers the complete engine call, including explanation generation. Timings are
+environment-sensitive and are not playing-strength or Elo measurements.
+
+### Depth-two paired CI results
+
+Workflow 43777722334, Python 3.12 on GitHub-hosted Ubuntu, two repetitions.
+Elapsed times are median seconds; node counts are medians.
+
+| Position | Full-window s / nodes | PVS s / nodes | PVS + aspiration s / nodes |
+|---|---:|---:|---:|
+| Opening | 0.2501 / 193 | 0.3395 / 273 | 0.2671 / 214 |
+| Middlegame | 1.8547 / 174 | 1.6635 / 174 | 1.6585 / 174 |
+| Endgame | 0.0461 / 58 | 0.0513 / 72 | 0.0514 / 72 |
+
+All three modes selected the same moves and scores:
+- Opening: `b1c3`, score `6.661338147750939`.
+- Middlegame: `e2a6`, score `-0.024000000000000042`.
+- Endgame: `f3e4`, score `-0.9550000000000001`.
+
+### Depth-three paired CI results
+
+The following are one-sample elapsed times and node counts from the same
+workflow run.
+
+| Position | Full-window s / nodes | PVS s / nodes | PVS + aspiration s / nodes |
+|---|---:|---:|---:|
+| Opening | 1.1734 / 847 | 1.3700 / 1048 | 1.3010 / 993 |
+| Middlegame | 8.5806 / 2034 | 7.9856 / 1990 | 7.9608 / 1990 |
+| Endgame | 0.1508 / 249 | 0.1360 / 231 | 0.1397 / 231 |
+
+All three modes again selected identical moves and scores:
+- Opening: `b1c3`, score `0.33999999999999997`.
+- Middlegame: `e2a6`, score `-0.11900000000000008`.
+- Endgame: `d4d5`, score `-0.8999999999999999`.
+
+The aspiration mode recorded one finite-window search per position at depth
+two and two per position at depth three (one for each completed depth after
+depth one). No aspiration re-search was needed in these six benchmark
+position/depth combinations: fail-low, fail-high and retry counters were all
+zero. The separate synthetic regression tests exercise both failure directions
+and the full-window fallback.
+
+### Interpretation and decision
+
+Aspiration windows reduced the measured PVS time in the opening at both
+benchmarked depths and slightly reduced the middlegame time. The endgame was
+marginally slower than PVS at both depths. Against full-window alpha-beta,
+PVS plus aspiration remained slower in the opening, faster in the middlegame,
+and slightly slower at depth two but faster at depth three in the endgame.
+Node counts were lower than PVS in the opening and unchanged in the other
+positions. These are small samples, especially at depth three, and do not
+establish a repeatable general speedup.
+
+Aspiration windows therefore remain experimental and opt-in, just like PVS.
+Full-window alpha-beta remains the default. The experiment is implemented,
+regression-tested and benchmarked; no claim of stronger play or Elo gain is
+made.
