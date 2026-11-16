@@ -621,7 +621,7 @@ Additional technical documentation is available in the repository:
 - [System Architecture](docs/architecture.md)
 - [Search & Decision-Making Notes](docs/search_notes.md)
 - [Phase 1 Search Reliability Audit](docs/phase1_search_reliability_audit.md), including regression results and paired full-window/PVS/aspiration benchmarks
-- [Aspiration Window Sweep](benchmarks/aspiration_window_sweep.py), comparing six fixed widths and optional adaptive windows across five quiet, tactical and endgame positions
+- [Aspiration Window Sweep](benchmarks/aspiration_window_sweep.py), comparing six fixed widths and optional adaptive windows across quiet, tactical and endgame positions; repeated depth-three/depth-four results are recorded in the audit
 
 ---
 
