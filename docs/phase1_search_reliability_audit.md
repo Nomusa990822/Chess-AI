@@ -648,7 +648,8 @@ recently completed iterative-deepening iterations. The first aspiration
 iteration has no pair of completed search scores to compare, so it uses the
 configured base width (0.5 by default). Subsequent windows use a bounded,
 deterministic scaling rule: stable scores narrow the window, while larger
-score swings widen it. The current bounds are 0.1 to 4.0 evaluation points. The raw scaling is\n`base_window * (0.5 + 0.5 * min(score_change, 4.0))`, clamped to those bounds.
+score swings widen it. The current bounds are 0.1 to 4.0 evaluation points. The raw scaling is
+`base_window * (0.5 + 0.5 * min(score_change, 4.0))`, clamped to those bounds.
 Fail-low/fail-high widening and the full-window fallback remain unchanged.
 Adaptive mode implicitly enables aspiration search but does not enable PVS;
 PVS remains a separate opt-in flag.
@@ -671,14 +672,17 @@ New tests cover:
 
 ### Adaptive benchmark methodology
 
-The aspiration sweep now optionally includes adaptive aspiration in its
-five-position comparison. With `--include-adaptive`, it compares full-window
+The aspiration sweep can restrict its fixed position set with `--positions`
+and now checks determinism and full-window parity for every repetition, not
+just the final sample. With `--include-adaptive`, it compares full-window
 alpha-beta, plain PVS, adaptive PVS/aspiration, and the requested fixed-width
 sweep. Every mode must reach the requested depth, return a legal move, restore
-the root position and match the full-window selected move and score. CI runs
-the adaptive comparison at depth three (one repetition) across all five
-positions, in addition to the existing depth-two fixed-width sweep. Timings
-remain environment-sensitive and are not Elo or playing-strength evidence.
+the root position and match the full-window selected move and score on every
+repetition. CI retains the depth-two six-width sweep and adds depth-three
+comparisons (three repetitions) and depth-four comparisons (two repetitions)
+for tactical White-to-move, tactical Black-to-move, and pawn-endgame positions.
+Timings remain environment-sensitive and are not Elo or playing-strength
+evidence.
 
 ### Depth-three adaptive comparison results
 
@@ -728,3 +732,56 @@ Adaptive aspiration is implemented, regression-tested and benchmarked, but
 remains opt-in. It is not promoted to the default and no speedup, playing
 strength or Elo claim is made. Full-window alpha-beta remains the production
 default; PVS and both fixed/adaptive aspiration modes remain experimental.
+
+
+## Repeated depth-three and depth-four adaptive comparison
+
+The expanded benchmark was run by
+[GitHub Actions run 43783254870](https://github.com/Nomusa990822/Chess-AI/actions/runs/43783254870)
+on commit
+[3b11e4b8aa60d02e2817c3d87b6f01aac12821ef](https://github.com/Nomusa990822/Chess-AI/commit/3b11e4b8aa60d02e2817c3d87b6f01aac12821ef).
+The final branch-head workflow passed compilation, the complete test suite
+(**133 passed in 81.78 seconds**), all existing fixed-position benchmarks,
+the depth-two width sweep, and both new repeated comparisons.
+
+The repeated comparisons used three positions: the tactical middlegame with
+White to move, the same position with Black to move, and the pawn endgame.
+Depth three used three repetitions per configuration; depth four used two.
+Each run compared full-window alpha-beta, plain PVS, fixed 0.5 aspiration,
+and adaptive aspiration with PVS. All configurations reached the requested
+depth. Every repetition returned the same selected move and score as its
+full-window reference, and restored the root position.
+
+### Depth three
+
+Values are median elapsed seconds / median nodes. Aspiration columns include
+median retries.
+
+| Position | Move | Score | Full-window | PVS | Fixed 0.5 | Adaptive |
+|---|---|---:|---:|---:|---:|---:|
+| Tactical, White | `e2a6` | -0.119 | 10.342 / 2034 | 9.581 / 1990 | 9.570 / 1990 / 0 | 9.546 / 1990 / 0 |
+| Tactical, Black | `b4c3` | -3.403 | 12.074 / 2088 | 12.139 / 2229 | 14.892 / 2515 / 2 | 14.884 / 2515 / 2 |
+| Pawn endgame | `d4d5` | -0.900 | 0.180 / 249 | 0.161 / 231 | 0.162 / 231 / 0 | 0.161 / 231 / 0 |
+
+### Depth four
+
+| Position | Move | Score | Full-window | PVS | Fixed 0.5 | Adaptive |
+|---|---|---:|---:|---:|---:|---:|
+| Tactical, White | `e2a6` | -0.119 | 51.277 / 6880 | 41.870 / 6837 | 41.739 / 6837 / 0 | 41.834 / 6837 / 0 |
+| Tactical, Black | `b4c3` | -3.403 | 59.710 / 7513 | 51.702 / 8325 | 50.945 / 7216 / 2 | 50.724 / 7215 / 2 |
+| Pawn endgame | `f3e4` | -0.880 | 0.473 / 641 | 0.519 / 736 | 0.525 / 736 / 0 | 0.522 / 736 / 0 |
+
+Across these repeated runs, adaptive aspiration did not show a material
+advantage over fixed 0.5. At depth three, the adaptive and fixed modes had
+identical node counts in all three positions. At depth four, node counts were
+identical in two positions and differed by one node in the tactical
+Black-to-move position. Their elapsed-time differences were small and should
+not be treated as a robust speedup. In the tactical Black-to-move position,
+both aspiration modes needed two retries; in the other tested cases they
+needed none.
+
+The deeper results strengthen the conclusion that adaptive sizing preserves
+search correctness, but do not justify replacing fixed aspiration or changing
+the production default. Adaptive aspiration remains an opt-in experiment.
+Full-window alpha-beta remains the production default, and no general speed,
+playing-strength or Elo claim is made.
