@@ -680,5 +680,51 @@ the adaptive comparison at depth three (one repetition) across all five
 positions, in addition to the existing depth-two fixed-width sweep. Timings
 remain environment-sensitive and are not Elo or playing-strength evidence.
 
-**CI result:** pending the first complete run on the final documentation and
-workflow tree. Results and the tested commit will be recorded after that run.
+### Depth-three adaptive comparison results
+
+The final implementation workflow,
+[run 43781393412](https://github.com/Nomusa990822/Chess-AI/actions/runs/43781393412),
+passed on commit
+[d43398636f8be86d33654f533003f36457bf8882](https://github.com/Nomusa990822/Chess-AI/commit/d43398636f8be86d33654f533003f36457bf8882).
+Compilation passed and the complete suite passed: **129 tests in 61.65
+seconds**. The existing fixed-position benchmarks, depth-two six-width
+aspiration sweep, and depth-three adaptive comparison all completed.
+
+All adaptive depth-three runs selected the same move and returned the same
+score as full-window alpha-beta:
+
+| Position | Move | Score (White perspective) |
+|---|---|---:|
+| Quiet start | `b1c3` | 0.340 |
+| Quiet open game | `b1c3` | 0.340 |
+| Tactical, White to move | `e2a6` | -0.119 |
+| Tactical, Black to move | `b4c3` | -3.403 |
+| Pawn endgame | `d4d5` | -0.900 |
+
+One-repetition elapsed seconds / nodes are shown below. Fixed and adaptive
+aspiration columns also include retry counts. The adaptive-window column is
+the window selected for the third search depth (the first adaptive aspiration
+iteration uses the configured base width of 0.5).
+
+| Position | Full-window s / nodes | Fixed 0.5 s / nodes / retries | Adaptive s / nodes / retries | Adaptive depth-three window |
+|---|---:|---:|---:|---:|
+| Quiet start | 1.059 / 847 | 1.180 / 993 / 0 | 0.887 / 792 / 2 | 0.335 |
+| Quiet open game | 4.019 / 1514 | 4.456 / 1845 / 0 | 2.646 / 1196 / 2 | 0.335 |
+| Tactical, White | 7.764 / 2034 | 7.232 / 1990 / 0 | 7.342 / 1990 / 0 | 0.250 |
+| Tactical, Black | 9.113 / 2088 | 11.102 / 2515 / 2 | 11.214 / 2515 / 2 | 0.442 |
+| Pawn endgame | 0.138 / 249 | 0.125 / 231 / 0 | 0.129 / 231 / 0 | 0.305 |
+
+The adaptive mode reduced measured nodes and elapsed time in both quiet
+positions, but required two retries in each. It was essentially neutral or
+slightly slower than fixed 0.5 in the tactical and endgame positions. This
+small, single-repetition depth-three sample does not establish a general
+performance advantage. It does show that adaptive sizing preserves the
+reference move and score across all five tested positions while changing its
+window in response to observed score stability.
+
+### Decision
+
+Adaptive aspiration is implemented, regression-tested and benchmarked, but
+remains opt-in. It is not promoted to the default and no speedup, playing
+strength or Elo claim is made. Full-window alpha-beta remains the production
+default; PVS and both fixed/adaptive aspiration modes remain experimental.
