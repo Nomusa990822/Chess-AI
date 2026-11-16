@@ -94,7 +94,9 @@ The AI explores possible future positions and selects moves using a combination 
 |---|---|
 | Minimax | Models optimal decision-making in a two-player, zero-sum game |
 | Alpha-Beta pruning | Eliminates branches that cannot influence the final decision |
-| Iterative deepening | Searches progressively deeper while respecting a time budget |\n| Principal Variation Search (PVS) | Uses null-window searches for later moves with full-window re-search when needed; experimental and opt-in |\n| Aspiration windows | Starts a new iteration around the previous completed score and widens on fail-low/fail-high; experimental and opt-in |
+| Iterative deepening | Searches progressively deeper while respecting a time budget |
+| Principal Variation Search (PVS) | Uses null-window searches for later moves with full-window re-search when needed; experimental and opt-in |
+| Aspiration windows | Starts a new iteration around the previous completed score and widens on fail-low/fail-high; experimental and opt-in |
 | Move ordering | Prioritises promising moves to improve pruning efficiency |
 | Transposition table | Reuses information from previously searched positions |
 | Quiescence search | Extends tactical positions beyond the normal search-depth boundary |
@@ -599,8 +601,8 @@ The tests help validate individual components and important game behaviours.
 ### Potential Improvements
 
 - [ ] Zobrist hashing for efficient position identification
-- [ ] Killer-move and history heuristics
-- [ ] Aspiration windows
+- [x] Killer-move and history heuristics
+- [x] Aspiration windows (implemented as an opt-in experiment)
 - [ ] Opening-book integration
 - [ ] Endgame tablebase support
 - [ ] PGN import and export
@@ -616,6 +618,7 @@ Additional technical documentation is available in the repository:
 
 - [System Architecture](docs/architecture.md)
 - [Search & Decision-Making Notes](docs/search_notes.md)
+- [Phase 1 Search Reliability Audit](docs/phase1_search_reliability_audit.md), including regression results and paired full-window/PVS/aspiration benchmarks
 
 ---
 
