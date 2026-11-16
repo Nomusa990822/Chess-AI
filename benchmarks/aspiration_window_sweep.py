@@ -31,12 +31,18 @@ def run_one(fen, depth, repeats, use_pvs, window, adaptive=False):
             raise RuntimeError(f"wanted depth {depth}, got {info['depth_reached']}")
         if move not in legal or state.get_position_key() != before:
             raise RuntimeError("illegal move or root state was not restored")
-        samples.append({"seconds": elapsed, "nodes": info["nodes"],
+        sample_move, sample_score = engine_move_uci(move), info["score"]
+        samples.append({"move": sample_move, "score": sample_score,
+            "seconds": elapsed, "nodes": info["nodes"],
             "searches": info["aspiration_searches"], "retries": info["aspiration_retries"],
             "fail_low": info["aspiration_fail_low"], "fail_high": info["aspiration_fail_high"],
             "adaptive_windows": info.get("adaptive_aspiration_windows", []),
             "score_changes": info.get("adaptive_score_changes", [])})
-        final_move, final_score = engine_move_uci(move), info["score"]
+        if final_move is not None and (
+            sample_move != final_move or abs(sample_score - final_score) > 1e-9
+        ):
+            raise RuntimeError("repeated benchmark runs were not deterministic")
+        final_move, final_score = sample_move, sample_score
     return {"move": final_move, "score": final_score,
         "median_seconds": statistics.median(x["seconds"] for x in samples),
         "median_nodes": statistics.median(x["nodes"] for x in samples),
@@ -45,6 +51,33 @@ def run_one(fen, depth, repeats, use_pvs, window, adaptive=False):
         "median_fail_low": statistics.median(x["fail_low"] for x in samples),
         "median_fail_high": statistics.median(x["fail_high"] for x in samples), "samples": samples}
 
+def select_positions(selection):
+    """Return requested fixed positions in caller order; reject unknown names."""
+    available = dict(POSITIONS)
+    if selection is None:
+        return list(POSITIONS)
+    names = [name.strip() for name in selection.split(",") if name.strip()]
+    if not names:
+        raise ValueError("--positions must name at least one benchmark position")
+    if len(names) != len(set(names)):
+        raise ValueError("--positions must not contain duplicate names")
+    unknown = [name for name in names if name not in available]
+    if unknown:
+        raise ValueError(f"unknown benchmark position(s): {', '.join(unknown)}")
+    return [(name, available[name]) for name in names]
+
+
+def assert_matches_reference(result, reference, label):
+    """Check every repetition, not only the final sample, against the oracle."""
+    if result["move"] != reference["move"] or abs(result["score"] - reference["score"]) > 1e-9:
+        raise RuntimeError(f"{label}: result differs from full-window reference")
+    if len(result["samples"]) != len(reference["samples"]):
+        raise RuntimeError(f"{label}: repetition count differs from reference")
+    for index, (sample, expected) in enumerate(zip(result["samples"], reference["samples"]), 1):
+        if sample["move"] != expected["move"] or abs(sample["score"] - expected["score"]) > 1e-9:
+            raise RuntimeError(f"{label}: repetition {index} differs from full-window reference")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--depth", type=int, default=2)
@@ -52,14 +85,20 @@ def main():
     parser.add_argument("--windows", default="0.05,0.1,0.25,0.5,1.0,2.0")
     parser.add_argument("--include-adaptive", action="store_true",
                         help="compare adaptive aspiration with full-window alpha-beta")
+    parser.add_argument("--positions", default=None,
+                        help="comma-separated position names; defaults to all fixed positions")
     args = parser.parse_args()
     if args.depth < 1 or args.repeats < 1: parser.error("--depth and --repeats must be positive")
     try: windows = [float(v) for v in args.windows.split(",")]
     except ValueError: parser.error("--windows must be comma-separated positive numbers")
     if not windows or any(not (v > 0 and v < float("inf")) for v in windows):
         parser.error("--windows must contain finite positive numbers")
+    try:
+        selected_positions = select_positions(args.positions)
+    except ValueError as exc:
+        parser.error(str(exc))
     output = []
-    for name, fen in POSITIONS:
+    for name, fen in selected_positions:
         board = chess.Board(fen)
         if not board.is_valid(): raise RuntimeError(f"{name}: invalid benchmark FEN")
         state = load_fen_position(fen)
@@ -67,22 +106,21 @@ def main():
             raise RuntimeError(f"{name}: engine legal moves differ from python-chess")
         full = run_one(fen, args.depth, args.repeats, False, None)
         pvs = run_one(fen, args.depth, args.repeats, True, None)
-        if pvs["move"] != full["move"] or abs(pvs["score"] - full["score"]) > 1e-9:
-            raise RuntimeError(f"{name}: PVS differs from full-window reference")
+        assert_matches_reference(pvs, full, f"{name}: PVS")
         adaptive_result = None
         if args.include_adaptive:
             adaptive_result = run_one(fen, args.depth, args.repeats, True, 0.5, adaptive=True)
-            if adaptive_result["move"] != full["move"] or abs(adaptive_result["score"] - full["score"]) > 1e-9:
-                raise RuntimeError(f"{name}: adaptive aspiration differs from full-window reference")
+            assert_matches_reference(adaptive_result, full, f"{name}: adaptive aspiration")
         sweep = []
         for window in windows:
             result = run_one(fen, args.depth, args.repeats, True, window)
-            if result["move"] != full["move"] or abs(result["score"] - full["score"]) > 1e-9:
-                raise RuntimeError(f"{name}, window={window}: aspiration differs from reference")
+            assert_matches_reference(result, full, f"{name}, window={window}: aspiration")
             sweep.append({"window": window, **result})
         output.append({"position": name, "fen": fen, "full_window": full, "pvs": pvs, "aspiration_sweep": sweep, "adaptive_aspiration": adaptive_result})
     print(json.dumps({"benchmark": "aspiration-window-sensitivity", "depth": args.depth,
-        "repeats": args.repeats, "windows": windows, "position_count": len(POSITIONS), "adaptive_included": args.include_adaptive,
+        "repeats": args.repeats, "windows": windows,
+        "positions": [name for name, _ in selected_positions],
+        "position_count": len(selected_positions), "adaptive_included": args.include_adaptive,
         "results": output}, indent=2))
 
 if __name__ == "__main__": main()
