@@ -94,7 +94,7 @@ The AI explores possible future positions and selects moves using a combination 
 |---|---|
 | Minimax | Models optimal decision-making in a two-player, zero-sum game |
 | Alpha-Beta pruning | Eliminates branches that cannot influence the final decision |
-| Iterative deepening | Searches progressively deeper while respecting a time budget |
+| Iterative deepening | Searches progressively deeper while respecting a time budget |\n| Principal Variation Search (PVS) | Uses null-window searches for later moves with full-window re-search when needed; experimental and opt-in |\n| Aspiration windows | Starts a new iteration around the previous completed score and widens on fail-low/fail-high; experimental and opt-in |
 | Move ordering | Prioritises promising moves to improve pruning efficiency |
 | Transposition table | Reuses information from previously searched positions |
 | Quiescence search | Extends tactical positions beyond the normal search-depth boundary |
