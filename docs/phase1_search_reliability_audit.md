@@ -785,3 +785,32 @@ search correctness, but do not justify replacing fixed aspiration or changing
 the production default. Adaptive aspiration remains an opt-in experiment.
 Full-window alpha-beta remains the production default, and no general speed,
 playing-strength or Elo claim is made.
+
+
+## Mathematical documentation and Phase 1 completion
+
+The README now includes a mathematical overview of the implemented decision
+system, with equations and Mermaid schematics for Minimax, Alpha-Beta pruning,
+iterative deepening, weighted evaluation, and the supporting search methods.
+The expanded reference at `docs/mathematical_foundations.md` derives the
+White-perspective minimax recurrence; Alpha-Beta bounds and complexity;
+material and positional evaluation terms; game-phase thresholds and mode
+weights; quiescence behaviour; transposition-table bound semantics and
+history-aware key; killer/history ordering; PVS null-window logic; and fixed
+and adaptive aspiration-window sizing. `docs/search_notes.md` was reconciled
+with the current implementation so it no longer describes already implemented
+heuristics as future work.
+
+The equations and constants were checked against `ai.py` and
+`evaluation.py`. In particular, the documentation distinguishes the
+handcrafted weighted evaluator from a learned model, records PVS and
+aspiration as opt-in experiments, and avoids treating benchmark timings as
+playing-strength or Elo evidence.
+
+The last verified pre-documentation Phase 1 implementation was commit
+`b46e9abaeeb680269c8f26daaa85c67351bff987`, whose workflow
+[43785652479](https://github.com/Nomusa990822/Chess-AI/actions/runs/43785652479)
+passed all 133 tests, compilation and the fixed-position plus repeated
+depth-three/depth-four benchmark suite. The documentation-only commit must
+receive its own complete CI verification before the Phase 1 pull request is
+merged.
