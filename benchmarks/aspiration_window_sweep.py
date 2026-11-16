@@ -24,7 +24,8 @@ def run_one(fen, depth, repeats, use_pvs, window, adaptive=False):
         started = time.perf_counter()
         move, info = choose_ai_move(state, legal, mode="fair", max_depth=depth,
             time_budget=90.0, use_pvs=use_pvs, use_aspiration=window is not None,
-            aspiration_window=window if window is not None else 0.5,\n            use_adaptive_aspiration=adaptive)
+            aspiration_window=window if window is not None else 0.5,
+            use_adaptive_aspiration=adaptive)
         elapsed = time.perf_counter() - started
         if info["depth_reached"] != depth:
             raise RuntimeError(f"wanted depth {depth}, got {info['depth_reached']}")
@@ -32,7 +33,9 @@ def run_one(fen, depth, repeats, use_pvs, window, adaptive=False):
             raise RuntimeError("illegal move or root state was not restored")
         samples.append({"seconds": elapsed, "nodes": info["nodes"],
             "searches": info["aspiration_searches"], "retries": info["aspiration_retries"],
-            "fail_low": info["aspiration_fail_low"], "fail_high": info["aspiration_fail_high"],\n            "adaptive_windows": info.get("adaptive_aspiration_windows", []),\n            "score_changes": info.get("adaptive_score_changes", [])})
+            "fail_low": info["aspiration_fail_low"], "fail_high": info["aspiration_fail_high"],
+            "adaptive_windows": info.get("adaptive_aspiration_windows", []),
+            "score_changes": info.get("adaptive_score_changes", [])})
         final_move, final_score = engine_move_uci(move), info["score"]
     return {"move": final_move, "score": final_score,
         "median_seconds": statistics.median(x["seconds"] for x in samples),
@@ -46,7 +49,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--depth", type=int, default=2)
     parser.add_argument("--repeats", type=int, default=2)
-    parser.add_argument("--windows", default="0.05,0.1,0.25,0.5,1.0,2.0")\n    parser.add_argument("--include-adaptive", action="store_true",\n                        help="compare adaptive aspiration with full-window alpha-beta")
+    parser.add_argument("--windows", default="0.05,0.1,0.25,0.5,1.0,2.0")
+    parser.add_argument("--include-adaptive", action="store_true",
+                        help="compare adaptive aspiration with full-window alpha-beta")
     args = parser.parse_args()
     if args.depth < 1 or args.repeats < 1: parser.error("--depth and --repeats must be positive")
     try: windows = [float(v) for v in args.windows.split(",")]
@@ -64,6 +69,11 @@ def main():
         pvs = run_one(fen, args.depth, args.repeats, True, None)
         if pvs["move"] != full["move"] or abs(pvs["score"] - full["score"]) > 1e-9:
             raise RuntimeError(f"{name}: PVS differs from full-window reference")
+        adaptive_result = None
+        if args.include_adaptive:
+            adaptive_result = run_one(fen, args.depth, args.repeats, True, 0.5, adaptive=True)
+            if adaptive_result["move"] != full["move"] or abs(adaptive_result["score"] - full["score"]) > 1e-9:
+                raise RuntimeError(f"{name}: adaptive aspiration differs from full-window reference")
         sweep = []
         for window in windows:
             result = run_one(fen, args.depth, args.repeats, True, window)
