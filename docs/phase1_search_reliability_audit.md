@@ -475,9 +475,11 @@ The regression suite now includes:
   completed depth-one result must remain published.
 - Existing PVS, legal-PV replay, move-state restoration and timeout tests.
 
-The first implementation/benchmark workflow run was superseded and cancelled
-while the benchmark script's newline formatting was corrected. The corrected
-workflow completed successfully as run
+Four intermediate push-triggered runs (43777629542, 43777669929,
+43777673934 and 43777718421) were automatically cancelled as subsequent
+commits superseded their branch heads while this batch was being assembled.
+They did not complete verification and are not counted as passes or failures.
+The corrected, complete workflow succeeded as run
 [43777722334](https://github.com/Nomusa990822/Chess-AI/actions/runs/43777722334)
 on commit
 [51454e38f39f5cea9e72ddada7d29d942b0e6bb4](https://github.com/Nomusa990822/Chess-AI/commit/51454e38f39f5cea9e72ddada7d29d942b0e6bb4).
